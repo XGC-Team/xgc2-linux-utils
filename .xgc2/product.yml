@@ -1,7 +1,7 @@
 schema: xgc2.product.v1
 id: xgc2-linux-utils
 name: XGC2 Linux Utils
-version: 1.1.0-15
+version: 1.1.0-16
 kind: toolchain-apt
 summary: Linux host utility scripts and cpufrequtils performance-governor persistence.
 groups:
@@ -45,4 +45,4 @@ release:
   ref: main
   workflow: release.yml
   apt_versions:
-    focal: 1.1.0-15
+    focal: 1.1.0-16
