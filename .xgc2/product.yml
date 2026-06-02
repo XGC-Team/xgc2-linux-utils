@@ -27,7 +27,12 @@ usage:
 ownership:
   paths:
     - /opt/ros/noetic/share/linux_performance
+    - /opt/ros/noetic/lib/linux_performance/configure-log-limits.sh
     - /opt/ros/noetic/lib/linux_performance/enable_performance_mode.sh
     - /opt/ros/noetic/lib/linux_performance/print_cpu_frequency.sh
     - /opt/ros/noetic/lib/linux_performance/query_cpu_state.sh
+    - /opt/ros/noetic/lib/linux_performance/restore-runtime-gateway.sh
+    - /opt/ros/noetic/lib/linux_performance/restore-runtime-nat-gateway.sh
     - /opt/ros/noetic/lib/linux_performance/restore_balanced_mode.sh
+    - /opt/ros/noetic/lib/linux_performance/setup-runtime-nat-gateway.sh
+    - /opt/ros/noetic/lib/linux_performance/use-runtime-gateway.sh
