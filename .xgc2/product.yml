@@ -1,0 +1,33 @@
+schema: xgc2.product.v1
+id: xgc2-linux-utils
+name: XGC2 Linux Utils
+kind: ros1-apt
+summary: ROS Noetic-accessible Linux CPU performance helper scripts for simulation and experiment runs.
+
+ros:
+  distro: noetic
+  packages:
+    - linux_performance
+
+apt:
+  distribution: focal
+  install:
+    - ros-noetic-xgc2-linux-utils
+  packages:
+    - ros-noetic-xgc2-linux-utils
+
+usage:
+  install: |
+    sudo apt update
+    sudo apt install ros-noetic-xgc2-linux-utils
+  smoke_test: |
+    rospack find linux_performance
+    rosrun linux_performance query_cpu_state.sh
+
+ownership:
+  paths:
+    - /opt/ros/noetic/share/linux_performance
+    - /opt/ros/noetic/lib/linux_performance/enable_performance_mode.sh
+    - /opt/ros/noetic/lib/linux_performance/print_cpu_frequency.sh
+    - /opt/ros/noetic/lib/linux_performance/query_cpu_state.sh
+    - /opt/ros/noetic/lib/linux_performance/restore_balanced_mode.sh
