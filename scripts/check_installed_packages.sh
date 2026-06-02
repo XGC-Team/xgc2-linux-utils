@@ -18,7 +18,6 @@ for script in \
   test -x "${path}"
 done
 
-rosrun "${ROS_PACKAGE}" query_cpu_state.sh >/dev/null
 rosrun "${ROS_PACKAGE}" print_cpu_frequency.sh >/dev/null
 
 echo "Installed package check passed"

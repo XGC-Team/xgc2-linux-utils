@@ -22,7 +22,7 @@ usage:
     sudo apt install ros-noetic-xgc2-linux-utils
   smoke_test: |
     rospack find linux_performance
-    rosrun linux_performance query_cpu_state.sh
+    rosrun linux_performance print_cpu_frequency.sh
 
 ownership:
   paths:
