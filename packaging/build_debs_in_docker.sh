@@ -71,13 +71,13 @@ docker run --rm \
       -DCMAKE_INSTALL_PREFIX=/opt/ros/noetic \
       -DCATKIN_ENABLE_TESTING=OFF
 
-    /workspace/linux-utils/scripts/package_debs.sh \
+    /workspace/linux-utils/packaging/package_debs.sh \
       --install-root /workspace/work/install-root \
       --output-dir /workspace/out
 
     if [[ "${INSTALL_CHECK}" == "true" ]]; then
       apt-get install -y /workspace/out/*.deb
-      /workspace/linux-utils/scripts/check_installed_packages.sh
+      /workspace/linux-utils/packaging/check_installed_packages.sh
     fi
   '
 
