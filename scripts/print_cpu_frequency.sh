@@ -3,11 +3,33 @@ set -eu
 
 print_once() {
     echo "time: $(date '+%F %T %Z')"
-    awk -F: '
-        /cpu MHz/ {
-            value=$2
-            gsub(/^[ \t]+/, "", value)
-            mhz = value + 0
+    {
+        awk -F: '
+            /cpu MHz/ {
+                value=$2
+                gsub(/^[ \t]+/, "", value)
+                if (value + 0 > 0) {
+                    printf "%.3f\n", value + 0
+                }
+            }
+        ' /proc/cpuinfo
+
+        for file in /sys/devices/system/cpu/cpu[0-9]*/cpufreq/scaling_cur_freq; do
+            [ -r "$file" ] || continue
+            khz=$(cat "$file" 2>/dev/null || true)
+            case "$khz" in
+                ''|*[!0-9]*)
+                    continue
+                    ;;
+            esac
+            awk -v khz="$khz" 'BEGIN { printf "%.3f\n", khz / 1000.0 }'
+        done
+    } | awk '
+        {
+            mhz = $1 + 0
+            if (mhz <= 0) {
+                next
+            }
             count++
             freq[count] = mhz
             sum += mhz
@@ -17,7 +39,7 @@ print_once() {
         END {
             if (count == 0) {
                 print "cpu_frequency: unavailable"
-                exit 1
+                exit 0
             }
             printf "logical_cpus: %d\n", count
             printf "min_mhz: %.1f\n", min
