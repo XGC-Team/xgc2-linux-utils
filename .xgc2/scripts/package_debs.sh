@@ -1,12 +1,21 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+REPO_ROOT="$(cd "${SCRIPT_DIR}/../.." && pwd)"
+
 INSTALL_ROOT=""
 OUTPUT_DIR=""
 ROS_DISTRO="${ROS_DISTRO:-noetic}"
-VERSION="${PACKAGE_VERSION:-1.0.0-1}"
 PACKAGE="ros-noetic-xgc2-linux-utils"
 ROS_PACKAGE="linux_performance"
+
+product_version() {
+  awk -F': *' '/^version:[[:space:]]*/ {print $2; exit}' "${REPO_ROOT}/.xgc2/product.yml"
+}
+
+VERSION="${PACKAGE_VERSION:-$(product_version)}"
+VERSION="${VERSION:-1.1.0-1}"
 
 while [[ $# -gt 0 ]]; do
   case "$1" in

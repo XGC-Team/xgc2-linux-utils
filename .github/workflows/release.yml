@@ -1,0 +1,122 @@
+name: release
+
+on:
+  workflow_dispatch:
+    inputs:
+      expected_version:
+        description: Expected .xgc2/product.yml version
+        required: true
+        type: string
+      expected_source_sha:
+        description: Expected source commit SHA
+        required: true
+        type: string
+      publish_apt:
+        description: Publish debs to the APT repository
+        required: true
+        type: boolean
+        default: false
+      run_cpp_quality:
+        description: Run C++ quality checks
+        required: true
+        type: boolean
+        default: false
+      run_source_tests:
+        description: Run source tests
+        required: true
+        type: boolean
+        default: false
+
+jobs:
+  release-guard:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        shell: bash
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Validate release inputs
+        env:
+          EXPECTED_VERSION: ${{ inputs.expected_version }}
+          EXPECTED_SOURCE_SHA: ${{ inputs.expected_source_sha }}
+        run: |
+          set -euo pipefail
+          product_version="$(awk -F': *' '/^version:[[:space:]]*/ {print $2; exit}' .xgc2/product.yml)"
+          if [[ "${product_version}" != "${EXPECTED_VERSION}" ]]; then
+            echo "product.yml version ${product_version} != expected_version ${EXPECTED_VERSION}" >&2
+            exit 1
+          fi
+          source_sha="$(git rev-parse HEAD)"
+          if [[ "${source_sha}" != "${EXPECTED_SOURCE_SHA}" ]]; then
+            echo "HEAD ${source_sha} != expected_source_sha ${EXPECTED_SOURCE_SHA}" >&2
+            exit 1
+          fi
+
+  cpp-quality:
+    if: ${{ inputs.run_cpp_quality }}
+    name: cpp-quality
+    needs: release-guard
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        shell: bash
+    steps:
+      - name: No standalone C++ quality gate configured
+        run: echo "No standalone C++ quality gate is configured for xgc2-linux-utils."
+
+  source-tests:
+    if: ${{ inputs.run_source_tests }}
+    name: source-tests
+    needs: release-guard
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        shell: bash
+    steps:
+      - name: No standalone source tests configured
+        run: echo "No standalone source tests are configured for xgc2-linux-utils."
+
+  build:
+    name: debs-${{ matrix.arch }}
+    needs:
+      - release-guard
+      - cpp-quality
+      - source-tests
+    if: ${{ always() && needs.release-guard.result == 'success' && (needs.cpp-quality.result == 'success' || needs.cpp-quality.result == 'skipped') && (needs.source-tests.result == 'success' || needs.source-tests.result == 'skipped') }}
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - arch: amd64
+            runner: ubuntu-latest
+          - arch: arm64
+            runner: ubuntu-24.04-arm
+    runs-on: ${{ matrix.runner }}
+    defaults:
+      run:
+        shell: bash
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Build and install-check deb package in Docker
+        run: |
+          set -euo pipefail
+          .xgc2/scripts/build_debs_in_docker.sh \
+            --work-dir "$RUNNER_TEMP/linux-utils-${{ matrix.arch }}" \
+            --output-dir "$GITHUB_WORKSPACE/debs"
+
+      - name: Upload deb artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: xgc2-linux-utils-debs-${{ matrix.arch }}
+          path: debs/*.deb
+
+      - name: Publish to self-hosted APT repository
+        if: ${{ inputs.publish_apt }}
+        env:
+          APT_REPO_HOST: ${{ secrets.APT_REPO_HOST }}
+          APT_REPO_PORT: ${{ secrets.APT_REPO_PORT }}
+          APT_REPO_SSH_KEY: ${{ secrets.APT_REPO_SSH_KEY }}
+          APT_REPO_KNOWN_HOSTS: ${{ secrets.APT_REPO_KNOWN_HOSTS }}
+        run: .xgc2/scripts/publish_apt_repo.sh --deb-dir debs

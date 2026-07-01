@@ -1,7 +1,7 @@
 schema: xgc2.product.v1
 id: xgc2-linux-utils
 name: XGC2 Linux Utils
-version: 1.0.0-1
+version: 1.1.0-1
 kind: ros1-apt
 summary: ROS Noetic-accessible Linux CPU performance helper scripts for simulation and experiment runs.
 
