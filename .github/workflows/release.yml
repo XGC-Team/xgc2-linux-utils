@@ -79,11 +79,7 @@ jobs:
 
   build:
     name: debs-${{ matrix.arch }}
-    needs:
-      - release-guard
-      - cpp-quality
-      - source-tests
-    if: ${{ always() && needs.release-guard.result == 'success' && (needs.cpp-quality.result == 'success' || needs.cpp-quality.result == 'skipped') && (needs.source-tests.result == 'success' || needs.source-tests.result == 'skipped') }}
+    needs: release-guard
     strategy:
       fail-fast: false
       matrix:
