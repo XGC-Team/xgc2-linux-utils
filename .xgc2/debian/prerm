@@ -1,0 +1,31 @@
+#!/bin/sh
+set -e
+
+state_dir="/var/lib/xgc2-utils-linux-performance-mode"
+config="/etc/default/cpufrequtils"
+backup="${state_dir}/cpufrequtils.default.before-xgc2"
+
+systemctl_quiet() {
+  if command -v systemctl >/dev/null 2>&1; then
+    systemctl "$@" >/dev/null 2>&1 || true
+  fi
+}
+
+if [ "$1" = "remove" ] || [ "$1" = "deconfigure" ]; then
+  systemctl_quiet stop cpufrequtils.service
+  systemctl_quiet disable cpufrequtils.service
+
+  if [ -e "${backup}" ]; then
+    cp -a "${backup}" "${config}"
+  else
+    rm -f "${config}"
+  fi
+
+  systemctl_quiet enable ondemand.service
+
+  if [ -d /run/systemd/system ]; then
+    systemctl_quiet restart ondemand.service
+  fi
+fi
+
+exit 0

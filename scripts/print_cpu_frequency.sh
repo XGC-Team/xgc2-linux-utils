@@ -49,7 +49,7 @@ print_once() {
                 printf "cpu%-3d %8.1f MHz\n", i - 1, freq[i]
             }
         }
-    ' /proc/cpuinfo
+    '
 }
 
 interval=${1:-}

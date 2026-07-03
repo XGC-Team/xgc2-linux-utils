@@ -1,0 +1,15 @@
+#!/bin/sh
+set -e
+
+old_service="xgc2-utils-linux-performance-mode.service"
+
+if command -v systemctl >/dev/null 2>&1; then
+  systemctl daemon-reload >/dev/null 2>&1 || true
+  systemctl reset-failed "${old_service}" >/dev/null 2>&1 || true
+fi
+
+if [ "$1" = "purge" ]; then
+  rm -rf /var/lib/xgc2-utils-linux-performance-mode
+fi
+
+exit 0

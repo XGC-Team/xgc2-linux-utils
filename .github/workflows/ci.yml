@@ -3,39 +3,34 @@ name: ci
 on:
   push:
     branches:
-      - noetic
+      - main
   pull_request:
     branches:
-      - noetic
+      - main
   workflow_dispatch:
 
 jobs:
   build:
-    name: debs-${{ matrix.arch }}
-    strategy:
-      fail-fast: false
-      matrix:
-        include:
-          - arch: amd64
-            runner: ubuntu-latest
-          - arch: arm64
-            runner: ubuntu-24.04-arm
-    runs-on: ${{ matrix.runner }}
+    name: debs
+    runs-on: ubuntu-latest
     defaults:
       run:
         shell: bash
     steps:
       - uses: actions/checkout@v4
 
-      - name: Build and install-check deb package in Docker
+      - name: Build deb package
         run: |
           set -euo pipefail
-          .xgc2/scripts/build_debs_in_docker.sh \
-            --work-dir "$RUNNER_TEMP/linux-utils-${{ matrix.arch }}" \
-            --output-dir "$GITHUB_WORKSPACE/debs"
+          .xgc2/scripts/package_debs.sh --output-dir "$GITHUB_WORKSPACE/debs"
+
+      - name: Verify package contents
+        run: |
+          set -euo pipefail
+          .xgc2/scripts/check_installed_packages.sh --deb debs/*.deb
 
       - name: Upload deb artifacts
         uses: actions/upload-artifact@v4
         with:
-          name: xgc2-linux-utils-debs-${{ matrix.arch }}
+          name: xgc2-utils-linux-performance-mode-debs
           path: debs/*.deb

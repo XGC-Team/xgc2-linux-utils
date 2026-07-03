@@ -84,7 +84,11 @@ set_all_governors() {
     governor=$1
 
     if have_command cpupower; then
-        if sudo cpupower frequency-set -g "$governor"; then
+        if [ "$(id -u)" -eq 0 ]; then
+            if cpupower frequency-set -g "$governor"; then
+                return 0
+            fi
+        elif have_command sudo && sudo cpupower frequency-set -g "$governor"; then
             return 0
         fi
         echo "cpupower failed; trying direct sysfs governor writes." >&2

@@ -1,40 +1,46 @@
 schema: xgc2.product.v1
 id: xgc2-linux-utils
 name: XGC2 Linux Utils
-version: 1.1.0-5
-kind: ros1-apt
-summary: ROS Noetic-accessible Linux CPU performance helper scripts for simulation
-  and experiment runs.
-ros:
-  distro: noetic
-  packages:
-  - linux_performance
+version: 1.1.0-10
+kind: toolchain-apt
+summary: Linux host utility scripts and cpufrequtils performance-governor persistence.
+groups:
+- utils
+- linux
 apt:
   distribution: focal
   install:
-  - ros-noetic-xgc2-linux-utils
+  - xgc2-utils-linux-performance-mode
   packages:
-  - ros-noetic-xgc2-linux-utils
+  - xgc2-utils-linux-performance-mode
+  depends:
+  - cpufrequtils
 usage:
   install: 'sudo apt update
 
-    sudo apt install ros-noetic-xgc2-linux-utils
+    sudo apt install xgc2-utils-linux-performance-mode
 
     '
-  smoke_test: 'rospack find linux_performance
+  smoke_test: 'cat /etc/default/cpufrequtils
 
-    rosrun linux_performance print_cpu_frequency.sh
+    systemctl status cpufrequtils.service
 
     '
 ownership:
   paths:
-  - /opt/ros/noetic/share/linux_performance
-  - /opt/ros/noetic/lib/linux_performance/configure-log-limits.sh
-  - /opt/ros/noetic/lib/linux_performance/enable_performance_mode.sh
-  - /opt/ros/noetic/lib/linux_performance/print_cpu_frequency.sh
-  - /opt/ros/noetic/lib/linux_performance/query_cpu_state.sh
-  - /opt/ros/noetic/lib/linux_performance/restore-runtime-gateway.sh
-  - /opt/ros/noetic/lib/linux_performance/restore-runtime-nat-gateway.sh
-  - /opt/ros/noetic/lib/linux_performance/restore_balanced_mode.sh
-  - /opt/ros/noetic/lib/linux_performance/setup-runtime-nat-gateway.sh
-  - /opt/ros/noetic/lib/linux_performance/use-runtime-gateway.sh
+  - /usr/lib/xgc2-utils/linux
+  - /usr/lib/xgc2-utils/linux/configure-log-limits.sh
+  - /usr/lib/xgc2-utils/linux/enable_performance_mode.sh
+  - /usr/lib/xgc2-utils/linux/print_cpu_frequency.sh
+  - /usr/lib/xgc2-utils/linux/query_cpu_state.sh
+  - /usr/lib/xgc2-utils/linux/restore-runtime-gateway.sh
+  - /usr/lib/xgc2-utils/linux/restore-runtime-nat-gateway.sh
+  - /usr/lib/xgc2-utils/linux/restore_balanced_mode.sh
+  - /usr/lib/xgc2-utils/linux/setup-runtime-nat-gateway.sh
+  - /usr/lib/xgc2-utils/linux/use-runtime-gateway.sh
+  - /usr/share/xgc2-utils-linux-performance-mode/cpufrequtils.default
+  - /etc/default/cpufrequtils
+release:
+  repository: lxk36/xgc2-linux-utils
+  ref: main
+  workflow: release.yml

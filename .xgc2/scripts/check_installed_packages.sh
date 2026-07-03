@@ -1,14 +1,57 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
-ROS_DISTRO="${ROS_DISTRO:-noetic}"
-ROS_PACKAGE="linux_performance"
+PACKAGE="${PACKAGE:-xgc2-utils-linux-performance-mode}"
+LIB_DIR="/usr/lib/xgc2-utils/linux"
+SHARE_DIR="/usr/share/${PACKAGE}"
+DEB_PATH=""
 
-source "/opt/ros/${ROS_DISTRO}/setup.bash"
+usage() {
+  cat <<EOF
+Usage: ${0##*/} --deb PATH
 
-dpkg -s ros-noetic-xgc2-linux-utils >/dev/null
-test "$(rospack find "${ROS_PACKAGE}")" = "/opt/ros/${ROS_DISTRO}/share/${ROS_PACKAGE}"
+Validate package metadata and payload without installing the package.
+EOF
+}
 
+while [[ $# -gt 0 ]]; do
+  case "$1" in
+    --deb)
+      DEB_PATH="$2"
+      shift 2
+      ;;
+    -h|--help)
+      usage
+      exit 0
+      ;;
+    *)
+      echo "unknown argument: $1" >&2
+      usage >&2
+      exit 2
+      ;;
+  esac
+done
+
+if [[ -z "${DEB_PATH}" ]]; then
+  echo "--deb is required" >&2
+  usage >&2
+  exit 2
+fi
+
+tmp_dir="$(mktemp -d)"
+cleanup() {
+  rm -rf "${tmp_dir}"
+}
+trap cleanup EXIT
+
+dpkg-deb --field "${DEB_PATH}" Package | grep -Fx "${PACKAGE}" >/dev/null
+dpkg-deb --field "${DEB_PATH}" Architecture | grep -Fx all >/dev/null
+dpkg-deb --field "${DEB_PATH}" Depends | grep -F "cpufrequtils" >/dev/null
+
+dpkg-deb --extract "${DEB_PATH}" "${tmp_dir}/root"
+dpkg-deb --control "${DEB_PATH}" "${tmp_dir}/control"
+
+test -r "${tmp_dir}/root${LIB_DIR}/common.sh"
 for script in \
   configure-log-limits.sh \
   enable_performance_mode.sh \
@@ -19,10 +62,23 @@ for script in \
   restore_balanced_mode.sh \
   setup-runtime-nat-gateway.sh \
   use-runtime-gateway.sh; do
-  path="/opt/ros/${ROS_DISTRO}/lib/${ROS_PACKAGE}/${script}"
-  test -x "${path}"
+  test -x "${tmp_dir}/root${LIB_DIR}/${script}"
 done
 
-rosrun "${ROS_PACKAGE}" print_cpu_frequency.sh >/dev/null
+test -r "${tmp_dir}/root${SHARE_DIR}/cpufrequtils.default"
+grep -Fx 'GOVERNOR="performance"' "${tmp_dir}/root${SHARE_DIR}/cpufrequtils.default" >/dev/null
+if find "${tmp_dir}/root/lib/systemd/system" -maxdepth 1 -name 'xgc2-utils-linux-performance-mode.service' 2>/dev/null | grep -q .; then
+  echo "package must not ship custom performance-mode systemd service" >&2
+  exit 1
+fi
 
-echo "Installed package check passed"
+test -x "${tmp_dir}/control/postinst"
+test -x "${tmp_dir}/control/prerm"
+test -x "${tmp_dir}/control/postrm"
+grep -F "systemctl_quiet disable ondemand.service" "${tmp_dir}/control/postinst" >/dev/null
+grep -F "systemctl_quiet enable cpufrequtils.service" "${tmp_dir}/control/postinst" >/dev/null
+grep -F 'GOVERNOR="performance"' "${tmp_dir}/control/postinst" >/dev/null
+grep -F "systemctl_quiet stop cpufrequtils.service" "${tmp_dir}/control/prerm" >/dev/null
+grep -F "systemctl_quiet enable ondemand.service" "${tmp_dir}/control/prerm" >/dev/null
+
+echo "Package content check passed"

@@ -2,7 +2,7 @@
 set -eu
 
 SCRIPT_DIR=$(CDPATH='' cd -- "$(dirname -- "$0")" && pwd)
-# shellcheck source=source/ros_ws/src/linux_performance/scripts/common.sh
+# shellcheck source=scripts/common.sh
 . "$SCRIPT_DIR/common.sh"
 
 if have_command powerprofilesctl; then
