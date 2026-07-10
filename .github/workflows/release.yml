@@ -26,6 +26,25 @@ on:
         required: true
         type: boolean
         default: false
+      release_id:
+        description: Parent orchestrator run id used for correlation and audit
+        required: false
+        default: ""
+        type: string
+      release_lock_digest:
+        description: SHA256 of the immutable release lock
+        required: false
+        default: ""
+        type: string
+      trusted_ci_run_id:
+        description: Exact successful push CI run whose trusted deb artifacts may be reused
+        required: false
+        default: ""
+        type: string
+
+permissions:
+  actions: read
+  contents: read
 
 jobs:
   release-guard:
@@ -52,6 +71,23 @@ jobs:
             echo "HEAD ${source_sha} != expected_source_sha ${EXPECTED_SOURCE_SHA}" >&2
             exit 1
           fi
+
+  package-compliance:
+    needs: release-guard
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        shell: bash
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 2
+
+      - name: Check packaging metadata and scripts
+        run: |
+          set -euo pipefail
+          git diff --check HEAD
+          bash -n .xgc2/scripts/*.sh
 
   cpp-quality:
     if: ${{ inputs.run_cpp_quality }}
@@ -87,27 +123,135 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
+      - name: Download trusted CI artifacts
+        if: ${{ inputs.trusted_ci_run_id != '' }}
+        uses: actions/download-artifact@v4
+        with:
+          github-token: ${{ github.token }}
+          repository: ${{ github.repository }}
+          run-id: ${{ inputs.trusted_ci_run_id }}
+          name: xgc2-utils-linux-performance-mode-debs
+          path: trusted
+
+      - name: Verify and stage trusted CI artifacts
+        if: ${{ inputs.trusted_ci_run_id != '' }}
+        run: |
+          for arch in amd64 arm64; do
+            python3 .xgc2/scripts/xgc2_artifact_manifest.py verify-build \
+              --artifact-dir trusted \
+              --deb-output-dir debs \
+              --manifest-output-dir build-manifests \
+              --product xgc2-linux-utils \
+              --product-version "${{ inputs.expected_version }}" \
+              --distribution focal \
+              --architecture "$arch" \
+              --source-sha "${{ inputs.expected_source_sha }}" \
+              --ci-run-id "${{ inputs.trusted_ci_run_id }}"
+          done
+
       - name: Build deb package
+        if: ${{ inputs.trusted_ci_run_id == '' }}
         run: |
           set -euo pipefail
           .xgc2/scripts/package_debs.sh --output-dir "$GITHUB_WORKSPACE/debs"
 
       - name: Verify package contents
+        if: ${{ inputs.trusted_ci_run_id == '' }}
         run: |
           set -euo pipefail
           .xgc2/scripts/check_installed_packages.sh --deb debs/*.deb
+
+      - name: Create fallback build manifests
+        if: ${{ inputs.trusted_ci_run_id == '' }}
+        run: |
+          for arch in amd64 arm64; do
+            python3 .xgc2/scripts/xgc2_artifact_manifest.py build \
+              --deb-dir debs \
+              --output-dir build-manifests \
+              --product xgc2-linux-utils \
+              --product-version "${{ inputs.expected_version }}" \
+              --distribution focal \
+              --architecture "$arch" \
+              --source-sha "${{ inputs.expected_source_sha }}" \
+              --ci-run-id "$GITHUB_RUN_ID" \
+              --ci-workflow "$GITHUB_WORKFLOW" \
+              --ci-workflow-ref "$GITHUB_WORKFLOW_REF"
+          done
 
       - name: Upload deb artifacts
         uses: actions/upload-artifact@v4
         with:
           name: xgc2-utils-linux-performance-mode-debs
-          path: debs/*.deb
+          path: |
+            debs/*.deb
+            build-manifests/*.json
+          retention-days: 14
+          include-hidden-files: true
+
+  publish-apt:
+    if: >-
+      ${{
+        always() &&
+        inputs.publish_apt &&
+        needs.release-guard.result == 'success' &&
+        needs.package-compliance.result == 'success' &&
+        needs.build.result == 'success' &&
+        (needs.cpp-quality.result == 'success' || needs.cpp-quality.result == 'skipped') &&
+        (needs.source-tests.result == 'success' || needs.source-tests.result == 'skipped')
+      }}
+    needs:
+      - release-guard
+      - package-compliance
+      - build
+      - cpp-quality
+      - source-tests
+    runs-on: ubuntu-latest
+    concurrency:
+      group: xgc2-apt-focal
+      cancel-in-progress: false
+    env:
+      APT_REPO_HOST: ${{ secrets.APT_REPO_HOST }}
+      APT_REPO_PORT: ${{ secrets.APT_REPO_PORT }}
+      APT_REPO_SSH_KEY: ${{ secrets.APT_REPO_SSH_KEY }}
+      APT_REPO_KNOWN_HOSTS: ${{ secrets.APT_REPO_KNOWN_HOSTS }}
+      APT_REPO_DISTRIBUTION: focal
+    defaults:
+      run:
+        shell: bash
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Download deb artifacts
+        uses: actions/download-artifact@v4
+        with:
+          name: xgc2-utils-linux-performance-mode-debs
+          path: release-input
+
+      - name: Validate artifacts and create release manifests
+        run: |
+          for arch in amd64 arm64; do
+            python3 .xgc2/scripts/xgc2_artifact_manifest.py verify-build \
+              --artifact-dir release-input \
+              --deb-output-dir staged/debs \
+              --manifest-output-dir staged/build-manifests \
+              --product xgc2-linux-utils \
+              --product-version "${{ inputs.expected_version }}" \
+              --distribution focal \
+              --architecture "$arch" \
+              --source-sha "${{ inputs.expected_source_sha }}"
+          done
+          python3 .xgc2/scripts/xgc2_artifact_manifest.py release \
+            --deb-dir staged/debs \
+            --build-manifest-dir staged/build-manifests \
+            --publish-dir publish \
+            --product xgc2-linux-utils \
+            --product-version "${{ inputs.expected_version }}" \
+            --distribution focal \
+            --source-sha "${{ inputs.expected_source_sha }}" \
+            --release-id "${{ inputs.release_id || github.run_id }}" \
+            --release-lock-digest "${{ inputs.release_lock_digest }}" \
+            --target-architecture amd64 \
+            --target-architecture arm64
 
       - name: Publish to self-hosted APT repository
-        if: ${{ inputs.publish_apt }}
-        env:
-          APT_REPO_HOST: ${{ secrets.APT_REPO_HOST }}
-          APT_REPO_PORT: ${{ secrets.APT_REPO_PORT }}
-          APT_REPO_SSH_KEY: ${{ secrets.APT_REPO_SSH_KEY }}
-          APT_REPO_KNOWN_HOSTS: ${{ secrets.APT_REPO_KNOWN_HOSTS }}
-        run: .xgc2/scripts/publish_apt_repo.sh --deb-dir debs
+        run: .xgc2/scripts/publish_apt_repo.sh --deb-dir publish

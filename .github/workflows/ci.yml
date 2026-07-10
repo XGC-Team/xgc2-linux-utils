@@ -29,8 +29,29 @@ jobs:
           set -euo pipefail
           .xgc2/scripts/check_installed_packages.sh --deb debs/*.deb
 
+      - name: Create trusted build manifests
+        run: |
+          product_version="$(awk -F': *' '/^version:/ {print $2; exit}' .xgc2/product.yml)"
+          for arch in amd64 arm64; do
+            python3 .xgc2/scripts/xgc2_artifact_manifest.py build \
+              --deb-dir debs \
+              --output-dir build-manifests \
+              --product xgc2-linux-utils \
+              --product-version "$product_version" \
+              --distribution focal \
+              --architecture "$arch" \
+              --source-sha "$GITHUB_SHA" \
+              --ci-run-id "$GITHUB_RUN_ID" \
+              --ci-workflow "$GITHUB_WORKFLOW" \
+              --ci-workflow-ref "$GITHUB_WORKFLOW_REF"
+          done
+
       - name: Upload deb artifacts
         uses: actions/upload-artifact@v4
         with:
           name: xgc2-utils-linux-performance-mode-debs
-          path: debs/*.deb
+          path: |
+            debs/*.deb
+            build-manifests/*.json
+          retention-days: 14
+          include-hidden-files: true
