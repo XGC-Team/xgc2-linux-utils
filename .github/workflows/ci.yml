@@ -35,7 +35,7 @@ jobs:
           for arch in amd64 arm64; do
             python3 .xgc2/scripts/xgc2_artifact_manifest.py build \
               --deb-dir debs \
-              --output-dir build-manifests \
+              --output-dir .ci/build-manifests \
               --product xgc2-linux-utils \
               --product-version "$product_version" \
               --distribution focal \
@@ -52,6 +52,6 @@ jobs:
           name: xgc2-utils-linux-performance-mode-debs
           path: |
             debs/*.deb
-            build-manifests/*.json
+            .ci/build-manifests/*.json
           retention-days: 14
           include-hidden-files: true
