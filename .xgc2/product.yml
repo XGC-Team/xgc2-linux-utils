@@ -1,14 +1,14 @@
 schema: xgc2.product.v1
 id: xgc2-linux-utils
 name: XGC2 Linux Utils
-version: 1.1.0-17
+version: 1.1.0-21
 kind: toolchain-apt
 summary: Linux host utility scripts and cpufrequtils performance-governor persistence.
 groups:
 - utils
 - linux
 apt:
-  distribution: focal
+  distribution: bionic,focal
   install:
   - xgc2-utils-linux-performance-mode
   packages:
@@ -21,15 +21,25 @@ usage:
     sudo apt install xgc2-utils-linux-performance-mode
 
     '
-  smoke_test: 'cat /etc/default/cpufrequtils
+  smoke_test: 'xcli help
+
+    xcli eval --once
+
+    cat /etc/default/cpufrequtils
 
     systemctl status cpufrequtils.service
 
     '
 ownership:
   paths:
+  - /usr/bin/xcli
   - /usr/lib/xgc2-utils/linux
+  - /usr/lib/xgc2-utils/linux/xcli
+  - /usr/lib/xgc2-utils/linux/configure-display-idle.sh
   - /usr/lib/xgc2-utils/linux/configure-log-limits.sh
+  - /usr/lib/xgc2-utils/linux/configure-no-suspend.sh
+  - /usr/lib/xgc2-utils/linux/configure-time-sync.sh
+  - /usr/lib/xgc2-utils/linux/configure-timezone.sh
   - /usr/lib/xgc2-utils/linux/enable_performance_mode.sh
   - /usr/lib/xgc2-utils/linux/print_cpu_frequency.sh
   - /usr/lib/xgc2-utils/linux/query_cpu_state.sh
@@ -41,8 +51,9 @@ ownership:
   - /usr/share/xgc2-utils-linux-performance-mode/cpufrequtils.default
   - /etc/default/cpufrequtils
 release:
-  repository: lxk36/xgc2-linux-utils
+  repository: XGC-Team/xgc2-linux-utils
   ref: main
   workflow: release.yml
   apt_versions:
-    focal: 1.1.0-17
+    bionic: 1.1.0-21
+    focal: 1.1.0-21

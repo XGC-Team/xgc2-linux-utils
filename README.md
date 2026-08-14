@@ -22,7 +22,7 @@ sudo apt install xgc2-utils-linux-performance-mode
 
 Installing the package writes `/etc/default/cpufrequtils`, disables Ubuntu's
 default `ondemand.service`, and enables `cpufrequtils.service` so the CPU
-governor is restored to `performance` at boot.
+governor is restored to `performance` at boot. It also installs `/usr/bin/xcli`.
 
 ## Smoke Test
 
@@ -35,13 +35,43 @@ systemctl status cpufrequtils.service
 
 ## Utility Scripts
 
-Installed scripts live under `/usr/lib/xgc2-utils/linux`:
+Use `xcli` on the robot. Two interfaces share the same verbs:
 
+- **CLI** for agents and scripts: `xcli <domain> <verb>`. Mutating verbs
+  save prior state and can be reversed with `restore`.
+- **TUI** for operators: `xcli` or `xcli eval`. Overview of disk, top
+  processes, NIC rates, and ROS topic Hz / jitter / pub-sub. `m` opens
+  the configuration menu (timezone, Wi-Fi, CPU, screen, sleep). Agents
+  that cannot attach a tty should use `xcli eval --once`.
+
+```sh
+xcli help
+xcli eval --once
+xcli wifi connect LabNet secret
+xcli wifi restore
+xcli time zone shanghai
+xcli time restore
+xcli screen idle 1800
+xcli screen restore
+xcli sleep off
+xcli sleep on
+xcli cpu performance
+xcli cpu balanced
+```
+
+Installed scripts live under `/usr/lib/xgc2-utils/linux`. Robots pick a
+subset at install time; installing this package only persists the
+performance governor.
+
+- `configure-timezone.sh`
+- `configure-time-sync.sh`
+- `configure-display-idle.sh`
+- `configure-no-suspend.sh`
+- `configure-log-limits.sh`
 - `enable_performance_mode.sh`
 - `restore_balanced_mode.sh`
 - `query_cpu_state.sh`
 - `print_cpu_frequency.sh`
-- `configure-log-limits.sh`
 - `setup-runtime-nat-gateway.sh`
 - `restore-runtime-nat-gateway.sh`
 - `use-runtime-gateway.sh`

@@ -52,8 +52,18 @@ dpkg-deb --extract "${DEB_PATH}" "${tmp_dir}/root"
 dpkg-deb --control "${DEB_PATH}" "${tmp_dir}/control"
 
 test -r "${tmp_dir}/root${LIB_DIR}/common.sh"
+test -x "${tmp_dir}/root${LIB_DIR}/xcli"
+test -L "${tmp_dir}/root/usr/bin/xcli"
+test -r "${tmp_dir}/root${LIB_DIR}/xcli_eval.py"
+test -r "${tmp_dir}/root${LIB_DIR}/xcli_eval_host.py"
+test -r "${tmp_dir}/root${LIB_DIR}/xcli_eval_ros.py"
+test -r "${tmp_dir}/root/usr/share/bash-completion/completions/xcli"
 for script in \
+  configure-display-idle.sh \
   configure-log-limits.sh \
+  configure-no-suspend.sh \
+  configure-time-sync.sh \
+  configure-timezone.sh \
   enable_performance_mode.sh \
   print_cpu_frequency.sh \
   query_cpu_state.sh \

@@ -1,0 +1,334 @@
+#!/usr/bin/env bash
+# Shared host CLI for every XGC2 robot. Every apply has a restore.
+set -euo pipefail
+
+UTILS="${XGC2_LINUX_UTILS:-$(CDPATH='' cd -- "$(dirname -- "$0")" && pwd)}"
+if [[ ! -x "${UTILS}/configure-timezone.sh" && -d /usr/lib/xgc2-utils/linux ]]; then
+  UTILS=/usr/lib/xgc2-utils/linux
+fi
+STATE_DIR="${XGC2_UTILS_STATE:-/var/lib/xgc2-utils/state}"
+
+usage() {
+  help_full
+}
+
+help_full() {
+  cat <<'EOF'
+NAME
+    xcli — XGC2 onboard host utility
+
+SYNOPSIS
+    xcli
+    xcli <domain> <verb> [args]
+    xcli eval [--once]
+    xcli help
+
+DESCRIPTION
+    Installed by xgc2-utils-linux-performance-mode. Two interfaces share
+    the same verbs:
+
+      CLI   for agents and scripts. Every mutating verb saves prior state
+            and can be reversed with restore (or the documented inverse).
+      TUI   for operators. A live overview of disk, processes, NICs, and
+            ROS topic rate / jitter / pub-sub. Configuration is a menu
+            that calls the same CLI verbs.
+
+    Invoking xcli with no arguments opens the TUI on a tty, or prints
+    this manual otherwise. Bash completion covers domains, verbs, and
+    common arguments.
+
+DOMAINS
+
+    eval, tui
+        Full-screen instrument. Refresh period about 1 s. Press q to quit.
+        Shows NIC / Wi-Fi rates, ROS-relevant disk paths, top CPU and
+        memory processes, topic Hz, inter-arrival CV, pub/sub graph, and
+        jump / silent / jitter notes. Missing collectors render as none;
+        the panel does not exit.
+
+        --once
+                Print a stable key=value snapshot to stdout and exit.
+                Intended for agents. Does not require a tty.
+
+        Keys: Tab focus, j/k scroll the focused pane, Enter act,
+        double-click a topic for topology or a tmux session to attach,
+        join on a Wi-Fi row opens a password card, K kill (confirm),
+        P ping gateway, bottom bar Scan LAN / Settings, q quit.
+
+        The overview is observe-only except user-confirmed kill, ping,
+        and menu actions.
+
+    wifi
+        connect <ssid> [password]
+                Associate with SSID. Omit password for an open network.
+        disconnect
+                Disconnect the current Wi-Fi device.
+        restore
+                Restore the connection saved before connect / disconnect.
+        scan    List nearby access points.
+        status  Show devices and the active connection.
+
+    time
+        zone [city]
+                Set the timezone. Default: shanghai.
+                Aliases: shanghai, cn, beijing, utc, tokyo, seoul,
+                singapore, hongkong, taipei.
+        sync    Enable NTP (ntp.aliyun.com, ntp.tencent.com,
+                ntp.ntsc.ac.cn).
+        restore Restore the previous timezone and NTP settings.
+        status  Show timedatectl (or date / /etc/timezone).
+
+    screen
+        idle [seconds]
+                Blank and lock after idle. 0 disables blanking.
+                Default: 1800.
+        restore Restore the previous idle policy.
+        status  Show the written profile.
+
+    sleep
+        off     Inhibit suspend, hibernate, and lid sleep.
+        on, restore
+                Restore the previous logind policy.
+        status  Show whether sleep is inhibited.
+
+    cpu
+        performance
+                Save the current governor, then switch to performance.
+        balanced, restore
+                Restore the previous governor.
+        status  Print a governor summary.
+
+EXIT STATUS
+    0   success
+    1   runtime failure (missing helper, no saved state, no tty for TUI)
+    2   usage error
+
+    wifi, time, screen, sleep, and cpu print a reason and return non-zero
+    on failure. eval keeps running when a collector is unavailable.
+
+EXAMPLES
+    xcli wifi connect LabNet secret
+    xcli wifi restore
+    xcli time zone shanghai
+    xcli time restore
+    xcli screen idle 1800
+    xcli sleep off
+    xcli cpu performance
+    xcli eval --once
+    xcli
+EOF
+}
+
+help_topic() {
+  help_full
+}
+
+run_eval() {
+  local py=""
+  py="$(command -v python3 || command -v python || true)"
+  if [[ -z "${py}" ]]; then
+    echo "xcli eval: python interpreter not found" >&2
+    exit 1
+  fi
+  local script="${UTILS}/xcli_eval.py"
+  if [[ ! -f "${script}" ]]; then
+    echo "xcli eval: missing ${script}" >&2
+    exit 1
+  fi
+  exec "${py}" "${script}" "$@"
+}
+
+need_cmd() {
+  command -v "$1" >/dev/null 2>&1 || {
+    echo "missing command: $1" >&2
+    exit 1
+  }
+}
+
+run_util() {
+  local name="$1"
+  shift
+  if [[ ! -x "${UTILS}/${name}" ]]; then
+    echo "missing helper: ${UTILS}/${name}" >&2
+    exit 1
+  fi
+  "${UTILS}/${name}" "$@"
+}
+
+wifi_active_name() {
+  nmcli -t -f NAME,TYPE connection show --active 2>/dev/null \
+    | awk -F: '$2=="802-11-wireless"{print $1; exit}'
+}
+
+wifi_connect() {
+  local ssid="${1:-}"
+  local password="${2:-}"
+  [[ -n "${ssid}" ]] || {
+    echo "usage: xcli wifi connect <ssid> [password]" >&2
+    exit 2
+  }
+  need_cmd nmcli
+  mkdir -p "${STATE_DIR}/wifi"
+  wifi_active_name > "${STATE_DIR}/wifi/connection.prev" || true
+  nmcli radio wifi on >/dev/null 2>&1 || true
+  if [[ -n "${password}" ]]; then
+    nmcli device wifi connect "${ssid}" password "${password}"
+  else
+    nmcli device wifi connect "${ssid}"
+  fi
+}
+
+wifi_disconnect() {
+  need_cmd nmcli
+  local ifc
+  ifc="$(nmcli -t -f DEVICE,TYPE device status | awk -F: '$2=="wifi"{print $1; exit}')"
+  [[ -n "${ifc}" ]] || {
+    echo "no wifi device" >&2
+    exit 1
+  }
+  mkdir -p "${STATE_DIR}/wifi"
+  wifi_active_name > "${STATE_DIR}/wifi/connection.prev" || true
+  nmcli device disconnect "${ifc}"
+}
+
+wifi_restore() {
+  need_cmd nmcli
+  local prev
+  prev="$(cat "${STATE_DIR}/wifi/connection.prev" 2>/dev/null || true)"
+  [[ -n "${prev}" ]] || {
+    echo "no saved wifi connection to restore" >&2
+    exit 1
+  }
+  nmcli connection up "${prev}"
+}
+
+wifi_scan() {
+  need_cmd nmcli
+  nmcli radio wifi on >/dev/null 2>&1 || true
+  nmcli device wifi rescan >/dev/null 2>&1 || true
+  nmcli -f SSID,SIGNAL,SECURITY,IN-USE device wifi list
+}
+
+wifi_status() {
+  need_cmd nmcli
+  nmcli -f DEVICE,TYPE,STATE,CONNECTION device status
+  echo
+  nmcli -f NAME,TYPE,DEVICE,AUTOCONNECT connection show --active
+}
+
+time_status() {
+  if command -v timedatectl >/dev/null 2>&1; then
+    timedatectl status
+  else
+    date
+    cat /etc/timezone 2>/dev/null || true
+  fi
+}
+
+screen_status() {
+  if [[ -f /etc/dconf/db/local.d/00-xgc2-display-idle ]]; then
+    grep -E 'idle-delay|lock-enabled|sleep-inactive' \
+      /etc/dconf/db/local.d/00-xgc2-display-idle
+  else
+    echo "no xcli screen profile written yet"
+  fi
+}
+
+sleep_status() {
+  if [[ -f /etc/systemd/logind.conf.d/xgc2-no-suspend.conf ]]; then
+    echo "sleep=off"
+  else
+    echo "sleep=host-default"
+  fi
+}
+
+cpu_status() {
+  if [[ -x "${UTILS}/query_cpu_state.sh" ]]; then
+    "${UTILS}/query_cpu_state.sh"
+  else
+    echo "cpu helper missing" >&2
+    exit 1
+  fi
+}
+
+domain="${1:-}"
+verb="${2:-}"
+if [[ -z "${domain}" ]]; then
+  if [[ -t 1 ]]; then
+    run_eval
+  fi
+  help_full
+  exit 0
+fi
+if [[ "${domain}" == "-h" || "${domain}" == "--help" || "${domain}" == "help" ]]; then
+  help_topic "${verb:-}"
+  exit 0
+fi
+if [[ "${domain}" == "eval" || "${domain}" == "tui" ]]; then
+  if [[ $# -gt 2 || ( $# -eq 2 && "${verb}" != "--once" ) ]]; then
+    echo "usage: xcli eval [--once]" >&2
+    exit 2
+  fi
+  if [[ "${verb}" == "--once" ]]; then
+    run_eval --once
+  fi
+  run_eval
+fi
+shift
+
+case "${domain}" in
+  wifi)
+    case "${verb}" in
+      connect) shift; wifi_connect "${1:-}" "${2:-}" ;;
+      disconnect) wifi_disconnect ;;
+      restore) wifi_restore ;;
+      scan) wifi_scan ;;
+      status) wifi_status ;;
+      *) echo "wifi verbs: connect disconnect restore scan status" >&2; exit 2 ;;
+    esac
+    ;;
+  time)
+    case "${verb}" in
+      zone) shift; run_util configure-timezone.sh "${1:-shanghai}" ;;
+      sync) run_util configure-time-sync.sh ;;
+      restore)
+        run_util configure-timezone.sh --restore
+        run_util configure-time-sync.sh --restore
+        ;;
+      status) time_status ;;
+      *) echo "time verbs: zone sync restore status" >&2; exit 2 ;;
+    esac
+    ;;
+  screen)
+    case "${verb}" in
+      idle)
+        shift
+        run_util configure-display-idle.sh --idle-seconds "${1:-1800}"
+        ;;
+      restore) run_util configure-display-idle.sh --restore ;;
+      status) screen_status ;;
+      *) echo "screen verbs: idle restore status" >&2; exit 2 ;;
+    esac
+    ;;
+  sleep)
+    case "${verb}" in
+      off) run_util configure-no-suspend.sh ;;
+      on|restore) run_util configure-no-suspend.sh --restore ;;
+      status) sleep_status ;;
+      *) echo "sleep verbs: off on restore status" >&2; exit 2 ;;
+    esac
+    ;;
+  cpu)
+    case "${verb}" in
+      performance) run_util enable_performance_mode.sh ;;
+      balanced|restore) run_util restore_balanced_mode.sh ;;
+      status) cpu_status ;;
+      *) echo "cpu verbs: performance balanced restore status" >&2; exit 2 ;;
+    esac
+    ;;
+  *)
+    echo "unknown domain: ${domain}" >&2
+    usage >&2
+    exit 2
+    ;;
+esac
