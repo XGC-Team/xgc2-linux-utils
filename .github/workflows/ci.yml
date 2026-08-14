@@ -10,7 +10,7 @@ on:
   workflow_dispatch:
 
 # Dependencies come from XGC2 CI images (xgc2-images).
-# Do not apt-get / pip install in this workflow.
+# Extra packages belong in that image repository, not here.
 
 jobs:
   package-compliance:
@@ -29,11 +29,7 @@ jobs:
           git diff --check HEAD
           bash -n .xgc2/scripts/*.sh
           bash -n scripts/xcli
-          if grep -RInE 'apt-get |apt install|pip3? install' \
-            .github/workflows .xgc2/scripts; then
-            echo "CI must not install packages; add them in xgc2-images" >&2
-            exit 1
-          fi
+          python3 .xgc2/scripts/check-workflow-bootstrap.py
 
   build:
     name: ${{ matrix.name }}

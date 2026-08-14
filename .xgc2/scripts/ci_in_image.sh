@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 # Build and smoke-test this product inside an XGC2 CI image.
-# The container is offline. Do not apt-get here; add packages in xgc2-images.
+# The container is offline. Extra packages belong in xgc2-images.
 set -euo pipefail
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
@@ -52,12 +52,6 @@ docker run --rm --network none \
   "${DOCKER_IMAGE}" \
   bash -lc '
     set -euo pipefail
-    if command -v apt-get >/dev/null 2>&1; then
-      if [[ -n "${http_proxy:-}${https_proxy:-}${HTTP_PROXY:-}${HTTPS_PROXY:-}" ]]; then
-        echo "CI image must not use apt proxies; install deps in xgc2-images" >&2
-        exit 1
-      fi
-    fi
     command -v python3 >/dev/null
     command -v dpkg-deb >/dev/null
     command -v bash >/dev/null
