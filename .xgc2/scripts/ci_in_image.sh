@@ -58,11 +58,20 @@ docker run --rm --network none \
     bash -n /workspace/src/scripts/xcli
     bash -n /workspace/src/.xgc2/scripts/package_debs.sh
     bash -n /workspace/src/.xgc2/scripts/check_installed_packages.sh
-    python3 -m py_compile \
-      /workspace/src/scripts/xcli_eval.py \
-      /workspace/src/scripts/xcli_eval_host.py \
-      /workspace/src/scripts/xcli_eval_ros.py \
-      /workspace/src/scripts/xcli_eval_mav.py
+    python3 - <<'PY'
+import ast
+from pathlib import Path
+root = Path("/workspace/src/scripts")
+for name in (
+    "xcli_eval.py",
+    "xcli_eval_host.py",
+    "xcli_eval_ros.py",
+    "xcli_eval_mav.py",
+):
+    path = root / name
+    ast.parse(path.read_text(), filename=str(path))
+    print("syntax ok", name)
+PY
     /workspace/src/.xgc2/scripts/package_debs.sh --output-dir /workspace/out
     /workspace/src/.xgc2/scripts/check_installed_packages.sh --deb /workspace/out/*.deb
     export XGC2_LINUX_UTILS=/workspace/src/scripts
