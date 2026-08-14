@@ -57,6 +57,7 @@ test -L "${tmp_dir}/root/usr/bin/xcli"
 test -r "${tmp_dir}/root${LIB_DIR}/xcli_eval.py"
 test -r "${tmp_dir}/root${LIB_DIR}/xcli_eval_host.py"
 test -r "${tmp_dir}/root${LIB_DIR}/xcli_eval_ros.py"
+test -r "${tmp_dir}/root${LIB_DIR}/xcli_eval_mav.py"
 test -r "${tmp_dir}/root/usr/share/bash-completion/completions/xcli"
 for script in \
   configure-display-idle.sh \

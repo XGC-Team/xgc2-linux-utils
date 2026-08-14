@@ -9,47 +9,120 @@ on:
       - main
   workflow_dispatch:
 
+# Dependencies come from XGC2 CI images (xgc2-images).
+# Do not apt-get / pip install in this workflow.
+
 jobs:
-  build:
-    name: debs
+  package-compliance:
+    name: package-compliance
     runs-on: ubuntu-latest
     defaults:
       run:
         shell: bash
     steps:
       - uses: actions/checkout@v4
-
-      - name: Build deb package
+        with:
+          fetch-depth: 2
+      - name: Check scripts and packaging metadata
         run: |
           set -euo pipefail
-          .xgc2/scripts/package_debs.sh --output-dir "$GITHUB_WORKSPACE/debs"
+          git diff --check HEAD
+          bash -n .xgc2/scripts/*.sh
+          bash -n scripts/xcli
+          if grep -RInE 'apt-get |apt install|pip3? install' \
+            .github/workflows .xgc2/scripts; then
+            echo "CI must not install packages; add them in xgc2-images" >&2
+            exit 1
+          fi
 
-      - name: Verify package contents
+  build:
+    name: ${{ matrix.name }}
+    needs: package-compliance
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - name: amd64-bionic-melodic
+            distro: bionic
+            ros: melodic
+            arch: amd64
+            runner: ubuntu-latest
+            image: ghcr.io/xgc-team/xgc2-images/xgc2-build-bionic-ros-melodic:1.0.0
+          - name: arm64-bionic-melodic
+            distro: bionic
+            ros: melodic
+            arch: arm64
+            runner: ubuntu-24.04-arm
+            image: ghcr.io/xgc-team/xgc2-images/xgc2-build-bionic-ros-melodic:1.0.0
+          - name: amd64-focal-noetic
+            distro: focal
+            ros: noetic
+            arch: amd64
+            runner: ubuntu-latest
+            image: ghcr.io/xgc-team/xgc2-images/xgc2-build-focal-ros-noetic:1.0.0
+          - name: arm64-focal-noetic
+            distro: focal
+            ros: noetic
+            arch: arm64
+            runner: ubuntu-24.04-arm
+            image: ghcr.io/xgc-team/xgc2-images/xgc2-build-focal-ros-noetic:1.0.0
+          - name: amd64-jammy-humble
+            distro: jammy
+            ros: humble
+            arch: amd64
+            runner: ubuntu-latest
+            image: ghcr.io/xgc-team/xgc2-images/xgc2-build-jammy-ros-humble:1.0.0
+          - name: arm64-jammy-humble
+            distro: jammy
+            ros: humble
+            arch: arm64
+            runner: ubuntu-24.04-arm
+            image: ghcr.io/xgc-team/xgc2-images/xgc2-build-jammy-ros-humble:1.0.0
+          - name: amd64-noble-jazzy
+            distro: noble
+            ros: jazzy
+            arch: amd64
+            runner: ubuntu-latest
+            image: ghcr.io/xgc-team/xgc2-images/xgc2-build-noble-ros-jazzy:1.0.0
+          - name: arm64-noble-jazzy
+            distro: noble
+            ros: jazzy
+            arch: arm64
+            runner: ubuntu-24.04-arm
+            image: ghcr.io/xgc-team/xgc2-images/xgc2-build-noble-ros-jazzy:1.0.0
+    runs-on: ${{ matrix.runner }}
+    defaults:
+      run:
+        shell: bash
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Build and smoke in CI image
         run: |
           set -euo pipefail
-          .xgc2/scripts/check_installed_packages.sh --deb debs/*.deb
+          .xgc2/scripts/ci_in_image.sh \
+            --image "${{ matrix.image }}" \
+            --output-dir "$GITHUB_WORKSPACE/debs"
 
       - name: Create trusted build manifests
         run: |
           product_version="$(awk -F': *' '/^version:/ {print $2; exit}' .xgc2/product.yml)"
-          for arch in amd64 arm64; do
-            python3 .xgc2/scripts/xgc2_artifact_manifest.py build \
-              --deb-dir debs \
-              --output-dir .ci/build-manifests \
-              --product xgc2-linux-utils \
-              --product-version "$product_version" \
-              --distribution focal \
-              --architecture "$arch" \
-              --source-sha "$GITHUB_SHA" \
-              --ci-run-id "$GITHUB_RUN_ID" \
-              --ci-workflow "$GITHUB_WORKFLOW" \
-              --ci-workflow-ref "$GITHUB_WORKFLOW_REF"
-          done
+          python3 .xgc2/scripts/xgc2_artifact_manifest.py build \
+            --deb-dir debs \
+            --output-dir .ci/build-manifests \
+            --product xgc2-linux-utils \
+            --product-version "$product_version" \
+            --distribution "${{ matrix.distro }}" \
+            --architecture "${{ matrix.arch }}" \
+            --source-sha "$GITHUB_SHA" \
+            --ci-run-id "$GITHUB_RUN_ID" \
+            --ci-workflow "$GITHUB_WORKFLOW" \
+            --ci-workflow-ref "$GITHUB_WORKFLOW_REF"
 
       - name: Upload deb artifacts
         uses: actions/upload-artifact@v4
         with:
-          name: xgc2-utils-linux-performance-mode-debs
+          name: xgc2-utils-linux-${{ matrix.name }}
           path: |
             debs/*.deb
             .ci/build-manifests/*.json

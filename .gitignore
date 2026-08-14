@@ -1,2 +1,4 @@
 debs/
 .work/
+scripts/__pycache__/
+*.pyc

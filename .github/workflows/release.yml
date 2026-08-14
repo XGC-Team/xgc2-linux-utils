@@ -144,46 +144,85 @@ jobs:
         run: echo "No standalone source tests are configured for xgc2-linux-utils."
 
   build:
-    name: debs
+    name: debs-${{ matrix.name }}
     needs: release-guard
-    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - name: amd64-bionic-melodic
+            distro: bionic
+            arch: amd64
+            runner: ubuntu-latest
+            image: ghcr.io/xgc-team/xgc2-images/xgc2-build-bionic-ros-melodic:1.0.0
+          - name: arm64-bionic-melodic
+            distro: bionic
+            arch: arm64
+            runner: ubuntu-24.04-arm
+            image: ghcr.io/xgc-team/xgc2-images/xgc2-build-bionic-ros-melodic:1.0.0
+          - name: amd64-focal-noetic
+            distro: focal
+            arch: amd64
+            runner: ubuntu-latest
+            image: ghcr.io/xgc-team/xgc2-images/xgc2-build-focal-ros-noetic:1.0.0
+          - name: arm64-focal-noetic
+            distro: focal
+            arch: arm64
+            runner: ubuntu-24.04-arm
+            image: ghcr.io/xgc-team/xgc2-images/xgc2-build-focal-ros-noetic:1.0.0
+          - name: amd64-jammy-humble
+            distro: jammy
+            arch: amd64
+            runner: ubuntu-latest
+            image: ghcr.io/xgc-team/xgc2-images/xgc2-build-jammy-ros-humble:1.0.0
+          - name: arm64-jammy-humble
+            distro: jammy
+            arch: arm64
+            runner: ubuntu-24.04-arm
+            image: ghcr.io/xgc-team/xgc2-images/xgc2-build-jammy-ros-humble:1.0.0
+          - name: amd64-noble-jazzy
+            distro: noble
+            arch: amd64
+            runner: ubuntu-latest
+            image: ghcr.io/xgc-team/xgc2-images/xgc2-build-noble-ros-jazzy:1.0.0
+          - name: arm64-noble-jazzy
+            distro: noble
+            arch: arm64
+            runner: ubuntu-24.04-arm
+            image: ghcr.io/xgc-team/xgc2-images/xgc2-build-noble-ros-jazzy:1.0.0
+    runs-on: ${{ matrix.runner }}
     defaults:
       run:
         shell: bash
     steps:
       - uses: actions/checkout@v4
 
-      - name: Build deb package
+      - name: Build and smoke in CI image
         run: |
           set -euo pipefail
-          .xgc2/scripts/package_debs.sh --output-dir "$GITHUB_WORKSPACE/debs"
-
-      - name: Verify package contents
-        run: |
-          set -euo pipefail
-          .xgc2/scripts/check_installed_packages.sh --deb debs/*.deb
+          .xgc2/scripts/ci_in_image.sh \
+            --image "${{ matrix.image }}" \
+            --output-dir "$GITHUB_WORKSPACE/debs"
 
       - name: Create release-train build manifests
         run: |
-          for arch in amd64 arm64; do
-            python3 .xgc2/scripts/xgc2_artifact_manifest.py build \
-              --deb-dir debs \
-              --output-dir .ci/build-manifests \
-              --product xgc2-linux-utils \
-              --product-version "${{ inputs.expected_version }}" \
-              --distribution focal \
-              --architecture "$arch" \
-              --source-sha "${{ inputs.expected_source_sha }}" \
-              --ci-run-id "$GITHUB_RUN_ID" \
-              --ci-workflow "$GITHUB_WORKFLOW" \
-              --ci-workflow-ref "$GITHUB_WORKFLOW_REF"
-          done
+          python3 .xgc2/scripts/xgc2_artifact_manifest.py build \
+            --deb-dir debs \
+            --output-dir .ci/build-manifests \
+            --product xgc2-linux-utils \
+            --product-version "${{ inputs.expected_version }}" \
+            --distribution "${{ matrix.distro }}" \
+            --architecture "${{ matrix.arch }}" \
+            --source-sha "${{ inputs.expected_source_sha }}" \
+            --ci-run-id "$GITHUB_RUN_ID" \
+            --ci-workflow "$GITHUB_WORKFLOW" \
+            --ci-workflow-ref "$GITHUB_WORKFLOW_REF"
 
       - name: Upload deb artifacts
         if: ${{ inputs.prepare_action == 'release' }}
         uses: actions/upload-artifact@v4
         with:
-          name: xgc2-utils-linux-performance-mode-debs
+          name: xgc2-utils-linux-${{ matrix.name }}
           path: |
             debs/*.deb
             .ci/build-manifests/*.json

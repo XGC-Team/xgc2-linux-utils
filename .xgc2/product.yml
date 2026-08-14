@@ -1,14 +1,14 @@
 schema: xgc2.product.v1
 id: xgc2-linux-utils
 name: XGC2 Linux Utils
-version: 1.1.0-21
+version: 1.1.0-22
 kind: toolchain-apt
 summary: Linux host utility scripts and cpufrequtils performance-governor persistence.
 groups:
 - utils
 - linux
 apt:
-  distribution: bionic,focal
+  distribution: bionic,focal,jammy,noble
   install:
   - xgc2-utils-linux-performance-mode
   packages:
@@ -55,5 +55,7 @@ release:
   ref: main
   workflow: release.yml
   apt_versions:
-    bionic: 1.1.0-21
-    focal: 1.1.0-21
+    bionic: 1.1.0-22
+    focal: 1.1.0-22
+    jammy: 1.1.0-22
+    noble: 1.1.0-22

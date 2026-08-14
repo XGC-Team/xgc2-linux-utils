@@ -441,7 +441,8 @@ def scan_lan(ipv4, iface, timeout=2.5):
 
 
 def sync_term_size(stdscr):
-    """Force curses to the real tty size. First frame often starts at 24x80."""
+    """Apply real tty size only when it differs. Calling resizeterm every
+    frame injects KEY_RESIZE and eats keys and clicks."""
     rows = cols = 0
     try:
         import fcntl
@@ -451,19 +452,23 @@ def sync_term_size(stdscr):
         rows, cols = struct.unpack("hhhh", raw)[:2]
     except Exception:
         rows = cols = 0
-    if rows >= 10 and cols >= 40:
+    try:
+        cur_h, cur_w = stdscr.getmaxyx()
+    except curses.error:
+        cur_h, cur_w = 0, 0
+    if rows < 10 or cols < 40:
+        return False
+    if int(rows) == cur_h and int(cols) == cur_w:
+        return False
+    try:
+        curses.resizeterm(int(rows), int(cols))
+        return True
+    except curses.error:
         try:
-            curses.resizeterm(int(rows), int(cols))
+            curses.resize_term(int(rows), int(cols))
+            return True
         except curses.error:
-            try:
-                curses.resize_term(int(rows), int(cols))
-            except curses.error:
-                pass
-    elif hasattr(curses, "update_lines_cols"):
-        try:
-            curses.update_lines_cols()
-        except curses.error:
-            pass
+            return False
 
 
 class Pen(object):
@@ -1521,7 +1526,6 @@ class App(object):
         self._dirty = True
 
     def draw(self, ui):
-        sync_term_size(ui.s)
         ui.paint()
         self.hits = []
         self.dlg_hits = []
@@ -2455,18 +2459,22 @@ def loop(stdscr, app):
         stdscr.nodelay(True)
     except curses.error:
         pass
-    stdscr.timeout(400)
+    stdscr.timeout(200)
     try:
-        curses.mousemask(curses.ALL_MOUSE_EVENTS | getattr(curses, "REPORT_MOUSE_POSITION", 0))
-        curses.mouseinterval(80)
+        curses.mousemask(curses.ALL_MOUSE_EVENTS)
+        curses.mouseinterval(120)
     except curses.error:
         pass
     sync_term_size(stdscr)
     ui = Pen(stdscr)
-    last = 0.0
+    last_data = 0.0
     started = time.monotonic()
     try:
         app.refresh()
+    except Exception:
+        pass
+    try:
+        app.draw(ui)
     except Exception:
         pass
     while True:
@@ -2474,6 +2482,11 @@ def loop(stdscr, app):
             ch = stdscr.getch()
         except curses.error:
             ch = -1
+        now = time.monotonic()
+        need_draw = False
+        if ch == curses.KEY_RESIZE or (now - started < 2.5 and sync_term_size(stdscr)):
+            need_draw = True
+            ch = -1 if ch == curses.KEY_RESIZE else ch
         if ch != -1:
             try:
                 result = app.key(ch)
@@ -2483,26 +2496,19 @@ def loop(stdscr, app):
                     return "tmux"
                 if result == "resize":
                     sync_term_size(stdscr)
-                    try:
-                        app.refresh()
-                    except Exception:
-                        pass
-                    last = time.monotonic()
+                need_draw = True
             except Exception:
                 app.flash = "input none"
-        now = time.monotonic()
-        interval = 0.8 if (now - started) < 4.0 else 2.0
-        need = False
-        if ch != -1:
-            need = True
-        if not last or now - last >= interval:
+                need_draw = True
+        interval = 1.0 if (now - started) < 3.0 else 2.0
+        if not last_data or now - last_data >= interval:
             try:
                 app.refresh()
             except Exception:
                 pass
-            last = now
-            need = True
-        if need or getattr(app, "_dirty", True):
+            last_data = now
+            need_draw = True
+        if need_draw or getattr(app, "_dirty", False):
             try:
                 app.draw(ui)
             except Exception:

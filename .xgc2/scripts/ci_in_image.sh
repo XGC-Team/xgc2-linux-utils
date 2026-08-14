@@ -1,0 +1,80 @@
+#!/usr/bin/env bash
+# Build and smoke-test this product inside an XGC2 CI image.
+# The container is offline. Do not apt-get here; add packages in xgc2-images.
+set -euo pipefail
+
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+REPO_ROOT="$(cd "${SCRIPT_DIR}/../.." && pwd)"
+
+DOCKER_IMAGE=""
+OUTPUT_DIR="${REPO_ROOT}/debs"
+
+usage() {
+  cat <<EOF
+Usage: ${0##*/} --image IMAGE [--output-dir DIR]
+EOF
+}
+
+while [[ $# -gt 0 ]]; do
+  case "$1" in
+    --image)
+      DOCKER_IMAGE="$2"
+      shift 2
+      ;;
+    --output-dir)
+      OUTPUT_DIR="$2"
+      shift 2
+      ;;
+    -h|--help)
+      usage
+      exit 0
+      ;;
+    *)
+      echo "unknown argument: $1" >&2
+      usage >&2
+      exit 2
+      ;;
+  esac
+done
+
+if [[ -z "${DOCKER_IMAGE}" ]]; then
+  echo "--image is required" >&2
+  exit 2
+fi
+
+mkdir -p "${OUTPUT_DIR}"
+docker pull "${DOCKER_IMAGE}"
+
+docker run --rm --network none \
+  -e DEBIAN_FRONTEND=noninteractive \
+  -v "${REPO_ROOT}:/workspace/src:ro" \
+  -v "${OUTPUT_DIR}:/workspace/out" \
+  "${DOCKER_IMAGE}" \
+  bash -lc '
+    set -euo pipefail
+    if command -v apt-get >/dev/null 2>&1; then
+      if [[ -n "${http_proxy:-}${https_proxy:-}${HTTP_PROXY:-}${HTTPS_PROXY:-}" ]]; then
+        echo "CI image must not use apt proxies; install deps in xgc2-images" >&2
+        exit 1
+      fi
+    fi
+    command -v python3 >/dev/null
+    command -v dpkg-deb >/dev/null
+    command -v bash >/dev/null
+    bash -n /workspace/src/scripts/xcli
+    bash -n /workspace/src/.xgc2/scripts/package_debs.sh
+    bash -n /workspace/src/.xgc2/scripts/check_installed_packages.sh
+    python3 -m py_compile \
+      /workspace/src/scripts/xcli_eval.py \
+      /workspace/src/scripts/xcli_eval_host.py \
+      /workspace/src/scripts/xcli_eval_ros.py \
+      /workspace/src/scripts/xcli_eval_mav.py
+    /workspace/src/.xgc2/scripts/package_debs.sh --output-dir /workspace/out
+    /workspace/src/.xgc2/scripts/check_installed_packages.sh --deb /workspace/out/*.deb
+    export XGC2_LINUX_UTILS=/workspace/src/scripts
+    /workspace/src/scripts/xcli help >/tmp/xcli.help
+    grep -q "^NAME$" /tmp/xcli.help
+    /workspace/src/scripts/xcli eval --once >/tmp/xcli.once
+    grep -q "^host=" /tmp/xcli.once
+    echo "ci_in_image ok $(python3 --version) $(uname -m)"
+  '
