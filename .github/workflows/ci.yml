@@ -38,10 +38,8 @@ jobs:
           bash -n scripts/configure-timezone.sh
           bash -n scripts/configure-time-sync.sh
           python3 .xgc2/scripts/check-workflow-bootstrap.py
-
   build:
     name: ${{ matrix.name }}
-    needs: package-compliance
     strategy:
       fail-fast: false
       matrix:
@@ -100,6 +98,8 @@ jobs:
         shell: bash
     steps:
       - uses: actions/checkout@v4
+
+
 
       - name: Build and smoke in CI image
         run: |
