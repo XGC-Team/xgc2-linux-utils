@@ -177,28 +177,10 @@ jobs:
           fi
 
 
-      - name: Check packaging metadata and scripts
+      - name: Refuse retired host-policy packages
         run: |
-          set -euo pipefail
-          git diff --check HEAD
-          bash -n .xgc2/scripts/*.sh
-          bash -n .xgc2/debian/postinst
-          bash -n .xgc2/debian/prerm
-          bash -n .xgc2/debian/postrm
-          bash -n .xgc2/debian/xgc2-utils-linux-timezone/postinst
-          bash -n .xgc2/debian/xgc2-utils-linux-timezone/prerm
-          bash -n .xgc2/debian/xgc2-utils-linux-timezone/postrm
-          python3 .xgc2/scripts/check-workflow-bootstrap.py
-
-
-
-
-      - name: Build and smoke in CI image
-        run: |
-          set -euo pipefail
-          .xgc2/scripts/ci_in_image.sh \
-            --image "${{ matrix.image }}" \
-            --output-dir "$GITHUB_WORKSPACE/debs"
+          echo "xgc2-utils-linux-* packages are retired. Host policy lives in the System Overview panel." >&2
+          exit 1
 
       - name: Create release-train build manifests
         run: |

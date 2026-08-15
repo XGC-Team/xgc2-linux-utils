@@ -3,75 +3,26 @@ id: xgc2-linux-utils
 name: XGC2 Linux Utils
 version: 1.1.0-24
 kind: toolchain-apt
-summary: Shared Linux host utilities. Timezone package sets Asia/Shanghai once; desktop package enables autologin; performance-mode persists the CPU governor and ships xcli.
+summary: Retired APT product. Timezone, desktop autologin, screen idle, and CPU
+  governor are Core/Agent System host policy, not install-time debs.
 groups:
 - utils
 - linux
 apt:
   distribution: bionic,focal,jammy,noble
-  install:
-  - xgc2-utils-linux-timezone
-  - xgc2-utils-linux-desktop
-  - xgc2-utils-linux-performance-mode
-  packages:
-  - xgc2-utils-linux-timezone
-  - xgc2-utils-linux-desktop
-  - xgc2-utils-linux-performance-mode
-  depends:
-  - tzdata
-  - cpufrequtils
+  install: []
+  packages: []
 usage:
-  install: 'sudo apt update
-
-    sudo apt install xgc2-utils-linux-timezone
-
-    sudo apt install xgc2-utils-linux-desktop
-
-    sudo apt install xgc2-utils-linux-performance-mode
-
-    '
-  smoke_test: 'test -x /usr/lib/xgc2-utils/linux/configure-timezone.sh
-
-    test -x /usr/lib/xgc2-utils/linux/configure-desktop-open.sh
-
-    xcli help
-
-    xcli eval --once
-
-    cat /etc/default/cpufrequtils
-
-    systemctl status cpufrequtils.service
-
-    '
+  install: ''
+  smoke_test: ''
+  notes: >-
+    Do not build or publish xgc2-utils-linux-timezone, desktop, or
+    performance-mode. Operators change those settings in the System Overview
+    host policy panel.
 ownership:
-  paths:
-  - /usr/bin/xcli
-  - /usr/lib/xgc2-utils/linux
-  - /usr/lib/xgc2-utils/linux/xcli
-  - /usr/lib/xgc2-utils/linux/configure-display-idle.sh
-  - /usr/lib/xgc2-utils/linux/configure-log-limits.sh
-  - /usr/lib/xgc2-utils/linux/configure-no-suspend.sh
-  - /usr/lib/xgc2-utils/linux/configure-time-sync.sh
-  - /usr/lib/xgc2-utils/linux/configure-timezone.sh
-  - /usr/share/doc/xgc2-utils-linux-timezone
-  - /usr/lib/xgc2-utils/linux/configure-desktop-open.sh
-  - /usr/share/doc/xgc2-utils-linux-desktop
-  - /usr/lib/xgc2-utils/linux/enable_performance_mode.sh
-  - /usr/lib/xgc2-utils/linux/print_cpu_frequency.sh
-  - /usr/lib/xgc2-utils/linux/query_cpu_state.sh
-  - /usr/lib/xgc2-utils/linux/restore-runtime-gateway.sh
-  - /usr/lib/xgc2-utils/linux/restore-runtime-nat-gateway.sh
-  - /usr/lib/xgc2-utils/linux/restore_balanced_mode.sh
-  - /usr/lib/xgc2-utils/linux/setup-runtime-nat-gateway.sh
-  - /usr/lib/xgc2-utils/linux/use-runtime-gateway.sh
-  - /usr/share/xgc2-utils-linux-performance-mode/cpufrequtils.default
-  - /etc/default/cpufrequtils
+  paths: []
 release:
   repository: XGC-Team/xgc2-linux-utils
   ref: main
   workflow: release.yml
-  apt_versions:
-    bionic: 1.1.0-24
-    focal: 1.1.0-24
-    jammy: 1.1.0-24
-    noble: 1.1.0-24
+  apt_versions: {}
