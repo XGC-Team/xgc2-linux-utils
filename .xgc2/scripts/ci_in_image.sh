@@ -58,6 +58,7 @@ docker run --rm --network none \
     bash -n /workspace/src/scripts/xcli
     bash -n /workspace/src/scripts/configure-timezone.sh
     bash -n /workspace/src/scripts/configure-time-sync.sh
+    bash -n /workspace/src/scripts/configure-desktop-open.sh
     bash -n /workspace/src/.xgc2/scripts/package_debs.sh
     bash -n /workspace/src/.xgc2/scripts/check_installed_packages.sh
     bash -n /workspace/src/.xgc2/debian/postinst
@@ -66,6 +67,9 @@ docker run --rm --network none \
     bash -n /workspace/src/.xgc2/debian/xgc2-utils-linux-timezone/postinst
     bash -n /workspace/src/.xgc2/debian/xgc2-utils-linux-timezone/prerm
     bash -n /workspace/src/.xgc2/debian/xgc2-utils-linux-timezone/postrm
+    bash -n /workspace/src/.xgc2/debian/xgc2-utils-linux-desktop/postinst
+    bash -n /workspace/src/.xgc2/debian/xgc2-utils-linux-desktop/prerm
+    bash -n /workspace/src/.xgc2/debian/xgc2-utils-linux-desktop/postrm
     python3 - <<'PY'
 import ast
 from pathlib import Path
@@ -84,8 +88,8 @@ PY
     shopt -s nullglob
     built_debs=(/workspace/out/*.deb)
     shopt -u nullglob
-    if [[ "${#built_debs[@]}" -ne 2 ]]; then
-      echo "expected 2 linux-utils debs, found ${#built_debs[@]}" >&2
+    if [[ "${#built_debs[@]}" -ne 3 ]]; then
+      echo "expected 3 linux-utils debs, found ${#built_debs[@]}" >&2
       ls -la /workspace/out >&2 || true
       exit 1
     fi

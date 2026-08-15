@@ -6,6 +6,7 @@ REPO_ROOT="$(cd "${SCRIPT_DIR}/../.." && pwd)"
 
 PERF_PACKAGE="xgc2-utils-linux-performance-mode"
 TZ_PACKAGE="xgc2-utils-linux-timezone"
+DESKTOP_PACKAGE="xgc2-utils-linux-desktop"
 ARCHITECTURE="${ARCHITECTURE:-all}"
 OUTPUT_DIR=""
 LIB_DIR="/usr/lib/xgc2-utils/linux"
@@ -14,7 +15,7 @@ usage() {
   cat <<EOF
 Usage: ${0##*/} --output-dir DIR
 
-Build the ${TZ_PACKAGE} and ${PERF_PACKAGE} Debian packages.
+Build the ${TZ_PACKAGE}, ${DESKTOP_PACKAGE}, and ${PERF_PACKAGE} Debian packages.
 EOF
 }
 
@@ -132,6 +133,53 @@ EOF
     "${OUTPUT_DIR}/${TZ_PACKAGE}_${VERSION}_${ARCHITECTURE}.deb" >/dev/null
 }
 
+build_desktop_deb() {
+  local pkg_root="${BUILD_DIR}/${DESKTOP_PACKAGE}"
+  install -d \
+    "${pkg_root}/DEBIAN" \
+    "${pkg_root}${LIB_DIR}" \
+    "${pkg_root}/usr/share/doc/${DESKTOP_PACKAGE}"
+
+  install -m 0755 \
+    "${REPO_ROOT}/scripts/configure-desktop-open.sh" \
+    "${pkg_root}${LIB_DIR}/configure-desktop-open.sh"
+  install -m 0755 \
+    "${REPO_ROOT}/.xgc2/debian/${DESKTOP_PACKAGE}/postinst" \
+    "${pkg_root}/DEBIAN/postinst"
+  install -m 0755 \
+    "${REPO_ROOT}/.xgc2/debian/${DESKTOP_PACKAGE}/prerm" \
+    "${pkg_root}/DEBIAN/prerm"
+  install -m 0755 \
+    "${REPO_ROOT}/.xgc2/debian/${DESKTOP_PACKAGE}/postrm" \
+    "${pkg_root}/DEBIAN/postrm"
+
+  cat > "${pkg_root}/usr/share/doc/${DESKTOP_PACKAGE}/README" <<EOF
+${DESKTOP_PACKAGE}
+
+Install-once desktop policy for robot hosts that should boot into an
+unlocked graphical session.
+
+On configure it enables display-manager autologin and turns off the
+GNOME/Unity lock screen. It does not restart gdm/lightdm.
+
+Remove the package to restore the previous display-manager and dconf
+state.
+EOF
+  chmod 0644 "${pkg_root}/usr/share/doc/${DESKTOP_PACKAGE}/README"
+
+  write_control \
+    "${pkg_root}" \
+    "${DESKTOP_PACKAGE}" \
+    "bash, coreutils" \
+    "dconf-cli" \
+    "XGC2 robot desktop autologin" \
+    "Enables display-manager autologin and disables the lock screen once."
+
+  dpkg-deb --root-owner-group --build \
+    "${pkg_root}" \
+    "${OUTPUT_DIR}/${DESKTOP_PACKAGE}_${VERSION}_${ARCHITECTURE}.deb" >/dev/null
+}
+
 build_performance_deb() {
   local pkg_root="${BUILD_DIR}/${PERF_PACKAGE}"
   local share_dir="/usr/share/${PERF_PACKAGE}"
@@ -149,7 +197,7 @@ build_performance_deb() {
     local base
     base="$(basename "${script}")"
     case "${base}" in
-      configure-timezone.sh|configure-time-sync.sh)
+      configure-timezone.sh|configure-time-sync.sh|configure-desktop-open.sh)
         continue
         ;;
     esac
@@ -195,7 +243,8 @@ ${PERF_PACKAGE}
 Installs XGC2 Linux helper scripts under ${LIB_DIR} and enables
 cpufrequtils performance governor persistence.
 
-Timezone and NTP live in ${TZ_PACKAGE}.
+Timezone and NTP live in ${TZ_PACKAGE}. Desktop autologin lives in
+${DESKTOP_PACKAGE}.
 EOF
   chmod 0644 "${pkg_root}/usr/share/doc/${PERF_PACKAGE}/README"
 
@@ -213,6 +262,7 @@ EOF
 }
 
 build_timezone_deb
+build_desktop_deb
 build_performance_deb
 
 find "${OUTPUT_DIR}" -maxdepth 1 -type f -name '*.deb' -print | sort

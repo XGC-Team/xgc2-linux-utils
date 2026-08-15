@@ -1,0 +1,11 @@
+#!/bin/sh
+# Autologin and unlocked desktop. Applies once on configure, not every boot.
+set -e
+
+LIB_DIR="/usr/lib/xgc2-utils/linux"
+
+if [ "$1" = "configure" ]; then
+  "${LIB_DIR}/configure-desktop-open.sh" || true
+fi
+
+exit 0

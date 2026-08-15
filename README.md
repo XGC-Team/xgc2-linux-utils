@@ -10,6 +10,7 @@ Host-level Linux utility scripts for XGC2 runtime machines.
 - Package type: `toolchain-apt`
 - Published packages:
   - `xgc2-utils-linux-timezone` — every robot. Sets `Asia/Shanghai` once.
+  - `xgc2-utils-linux-desktop` — robot desktops. Autologin and no lock screen.
   - `xgc2-utils-linux-performance-mode` — xcli plus CPU performance persistence
 - Runtime service:
   - `cpufrequtils.service` (performance-mode only)
@@ -30,14 +31,30 @@ sudo apt install xgc2-utils-linux-timezone
 timedatectl
 ```
 
+## Desktop
+
+`xgc2-utils-linux-desktop` applies on **install**, not on every boot.
+
+- `postinst` enables display-manager autologin and turns off the GNOME/Unity lock screen.
+- It does not restart gdm/lightdm; autologin takes effect on the next boot.
+- `apt remove` restores the previous display-manager and dconf state.
+
+```sh
+sudo apt update
+sudo apt install xgc2-utils-linux-desktop
+```
+
 ## Install
 
-Every robot should install the timezone package. Add performance-mode only
-when the host should persist the CPU governor and ship `xcli`.
+Every robot should install the timezone package. Add the desktop package
+when the host should boot into an unlocked graphical session. Add
+performance-mode only when the host should persist the CPU governor and
+ship `xcli`.
 
 ```sh
 sudo apt update
 sudo apt install xgc2-utils-linux-timezone
+sudo apt install xgc2-utils-linux-desktop
 sudo apt install xgc2-utils-linux-performance-mode
 ```
 

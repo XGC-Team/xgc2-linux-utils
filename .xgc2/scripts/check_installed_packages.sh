@@ -3,6 +3,7 @@ set -euo pipefail
 
 PERF_PACKAGE="xgc2-utils-linux-performance-mode"
 TZ_PACKAGE="xgc2-utils-linux-timezone"
+DESKTOP_PACKAGE="xgc2-utils-linux-desktop"
 LIB_DIR="/usr/lib/xgc2-utils/linux"
 DEB_DIR=""
 DEB_PATH=""
@@ -100,6 +101,7 @@ check_timezone_deb() {
   test ! -e "${tmp_dir}/timezone/root/usr/bin/xcli"
   test ! -e "${tmp_dir}/timezone/root${LIB_DIR}/xcli"
   test ! -e "${tmp_dir}/timezone/root${LIB_DIR}/enable_performance_mode.sh"
+  test ! -e "${tmp_dir}/timezone/root${LIB_DIR}/configure-desktop-open.sh"
   test ! -d "${tmp_dir}/timezone/root/lib/systemd/system"
   test -x "${tmp_dir}/timezone/control/postinst"
   test -x "${tmp_dir}/timezone/control/prerm"
@@ -131,6 +133,7 @@ check_performance_deb() {
   test -r "${tmp_dir}/perf/root/usr/share/bash-completion/completions/xcli"
   test ! -e "${tmp_dir}/perf/root${LIB_DIR}/configure-timezone.sh"
   test ! -e "${tmp_dir}/perf/root${LIB_DIR}/configure-time-sync.sh"
+  test ! -e "${tmp_dir}/perf/root${LIB_DIR}/configure-desktop-open.sh"
   for script in \
     configure-display-idle.sh \
     configure-log-limits.sh \
@@ -165,7 +168,30 @@ check_performance_deb() {
   grep -F "systemctl_quiet enable ondemand.service" "${tmp_dir}/perf/control/prerm" >/dev/null
 }
 
+check_desktop_deb() {
+  local deb
+  deb="$(find_deb "${DESKTOP_PACKAGE}")"
+  dpkg-deb --field "${deb}" Architecture | grep -Fx all >/dev/null
+  extract_deb "${deb}" "${tmp_dir}/desktop"
+
+  test -x "${tmp_dir}/desktop/root${LIB_DIR}/configure-desktop-open.sh"
+  test ! -e "${tmp_dir}/desktop/root/usr/bin/xcli"
+  test ! -e "${tmp_dir}/desktop/root${LIB_DIR}/configure-timezone.sh"
+  test ! -e "${tmp_dir}/desktop/root${LIB_DIR}/enable_performance_mode.sh"
+  test ! -d "${tmp_dir}/desktop/root/lib/systemd/system"
+  test -x "${tmp_dir}/desktop/control/postinst"
+  test -x "${tmp_dir}/desktop/control/prerm"
+  test -x "${tmp_dir}/desktop/control/postrm"
+  grep -F "configure-desktop-open.sh" "${tmp_dir}/desktop/control/postinst" >/dev/null
+  grep -F "configure-desktop-open.sh\" --restore" "${tmp_dir}/desktop/control/prerm" >/dev/null
+  if grep -E "systemctl enable|WantedBy=" "${tmp_dir}/desktop/control/postinst" >/dev/null; then
+    echo "desktop package must not enable a boot unit" >&2
+    exit 1
+  fi
+}
+
 check_timezone_deb
+check_desktop_deb
 check_performance_deb
 
 echo "Package content check passed"

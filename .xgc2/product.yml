@@ -1,9 +1,9 @@
 schema: xgc2.product.v1
 id: xgc2-linux-utils
 name: XGC2 Linux Utils
-version: 1.1.0-23
+version: 1.1.0-24
 kind: toolchain-apt
-summary: Shared Linux host utilities. Timezone package sets Asia/Shanghai once; performance-mode persists the CPU governor and ships xcli.
+summary: Shared Linux host utilities. Timezone package sets Asia/Shanghai once; desktop package enables autologin; performance-mode persists the CPU governor and ships xcli.
 groups:
 - utils
 - linux
@@ -11,9 +11,11 @@ apt:
   distribution: bionic,focal,jammy,noble
   install:
   - xgc2-utils-linux-timezone
+  - xgc2-utils-linux-desktop
   - xgc2-utils-linux-performance-mode
   packages:
   - xgc2-utils-linux-timezone
+  - xgc2-utils-linux-desktop
   - xgc2-utils-linux-performance-mode
   depends:
   - tzdata
@@ -23,10 +25,14 @@ usage:
 
     sudo apt install xgc2-utils-linux-timezone
 
+    sudo apt install xgc2-utils-linux-desktop
+
     sudo apt install xgc2-utils-linux-performance-mode
 
     '
   smoke_test: 'test -x /usr/lib/xgc2-utils/linux/configure-timezone.sh
+
+    test -x /usr/lib/xgc2-utils/linux/configure-desktop-open.sh
 
     xcli help
 
@@ -48,6 +54,8 @@ ownership:
   - /usr/lib/xgc2-utils/linux/configure-time-sync.sh
   - /usr/lib/xgc2-utils/linux/configure-timezone.sh
   - /usr/share/doc/xgc2-utils-linux-timezone
+  - /usr/lib/xgc2-utils/linux/configure-desktop-open.sh
+  - /usr/share/doc/xgc2-utils-linux-desktop
   - /usr/lib/xgc2-utils/linux/enable_performance_mode.sh
   - /usr/lib/xgc2-utils/linux/print_cpu_frequency.sh
   - /usr/lib/xgc2-utils/linux/query_cpu_state.sh
@@ -63,7 +71,7 @@ release:
   ref: main
   workflow: release.yml
   apt_versions:
-    bionic: 1.1.0-23
-    focal: 1.1.0-23
-    jammy: 1.1.0-23
-    noble: 1.1.0-23
+    bionic: 1.1.0-24
+    focal: 1.1.0-24
+    jammy: 1.1.0-24
+    noble: 1.1.0-24
