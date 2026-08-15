@@ -8,21 +8,43 @@ Host-level Linux utility scripts for XGC2 runtime machines.
 - Source path: `products/utils/linux`
 - Release branch: `main`
 - Package type: `toolchain-apt`
-- Published package:
-  - `xgc2-utils-linux-performance-mode`
+- Published packages:
+  - `xgc2-utils-linux-timezone` — every robot. Sets `Asia/Shanghai` once.
+  - `xgc2-utils-linux-performance-mode` — xcli plus CPU performance persistence
 - Runtime service:
-  - `cpufrequtils.service`
+  - `cpufrequtils.service` (performance-mode only)
 
-## Install
+## Timezone
+
+`xgc2-utils-linux-timezone` applies on **install**, not on every boot.
+
+- `postinst` writes `Asia/Shanghai` and enables the distro `systemd-timesyncd`.
+- There is no XGC2 timezone boot unit. `/etc/localtime` persists across reboot.
+- NTP is the stock timesyncd service, enabled once. When a network appears,
+  the clock syncs; this package does not wait for a network during `apt`.
+- `apt remove` restores the previous zone and NTP state.
 
 ```sh
 sudo apt update
+sudo apt install xgc2-utils-linux-timezone
+timedatectl
+```
+
+## Install
+
+Every robot should install the timezone package. Add performance-mode only
+when the host should persist the CPU governor and ship `xcli`.
+
+```sh
+sudo apt update
+sudo apt install xgc2-utils-linux-timezone
 sudo apt install xgc2-utils-linux-performance-mode
 ```
 
-Installing the package writes `/etc/default/cpufrequtils`, disables Ubuntu's
+Installing performance-mode writes `/etc/default/cpufrequtils`, disables Ubuntu's
 default `ondemand.service`, and enables `cpufrequtils.service` so the CPU
-governor is restored to `performance` at boot. It also installs `/usr/bin/xcli`.
+governor is restored to `performance` at boot. It also installs `/usr/bin/xcli`
+and depends on the timezone package.
 
 ## Smoke Test
 
@@ -59,12 +81,12 @@ xcli cpu performance
 xcli cpu balanced
 ```
 
-Installed scripts live under `/usr/lib/xgc2-utils/linux`. Robots pick a
-subset at install time; installing this package only persists the
-performance governor.
+Installed scripts live under `/usr/lib/xgc2-utils/linux`. The timezone
+package owns `configure-timezone.sh` and `configure-time-sync.sh`.
+Performance-mode owns xcli and the CPU/network helpers.
 
-- `configure-timezone.sh`
-- `configure-time-sync.sh`
+- `configure-timezone.sh` (timezone package)
+- `configure-time-sync.sh` (timezone package)
 - `configure-display-idle.sh`
 - `configure-no-suspend.sh`
 - `configure-log-limits.sh`

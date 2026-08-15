@@ -56,8 +56,16 @@ docker run --rm --network none \
     command -v dpkg-deb >/dev/null
     command -v bash >/dev/null
     bash -n /workspace/src/scripts/xcli
+    bash -n /workspace/src/scripts/configure-timezone.sh
+    bash -n /workspace/src/scripts/configure-time-sync.sh
     bash -n /workspace/src/.xgc2/scripts/package_debs.sh
     bash -n /workspace/src/.xgc2/scripts/check_installed_packages.sh
+    bash -n /workspace/src/.xgc2/debian/postinst
+    bash -n /workspace/src/.xgc2/debian/prerm
+    bash -n /workspace/src/.xgc2/debian/postrm
+    bash -n /workspace/src/.xgc2/debian/xgc2-utils-linux-timezone/postinst
+    bash -n /workspace/src/.xgc2/debian/xgc2-utils-linux-timezone/prerm
+    bash -n /workspace/src/.xgc2/debian/xgc2-utils-linux-timezone/postrm
     python3 - <<'PY'
 import ast
 from pathlib import Path
@@ -73,7 +81,15 @@ for name in (
     print("syntax ok", name)
 PY
     /workspace/src/.xgc2/scripts/package_debs.sh --output-dir /workspace/out
-    /workspace/src/.xgc2/scripts/check_installed_packages.sh --deb /workspace/out/*.deb
+    shopt -s nullglob
+    built_debs=(/workspace/out/*.deb)
+    shopt -u nullglob
+    if [[ "${#built_debs[@]}" -ne 2 ]]; then
+      echo "expected 2 linux-utils debs, found ${#built_debs[@]}" >&2
+      ls -la /workspace/out >&2 || true
+      exit 1
+    fi
+    /workspace/src/.xgc2/scripts/check_installed_packages.sh --deb-dir /workspace/out
     export XGC2_LINUX_UTILS=/workspace/src/scripts
     /workspace/src/scripts/xcli help >/tmp/xcli.help
     grep -q "^NAME$" /tmp/xcli.help

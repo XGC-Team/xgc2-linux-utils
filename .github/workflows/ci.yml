@@ -28,7 +28,15 @@ jobs:
           set -euo pipefail
           git diff --check HEAD
           bash -n .xgc2/scripts/*.sh
+          bash -n .xgc2/debian/postinst
+          bash -n .xgc2/debian/prerm
+          bash -n .xgc2/debian/postrm
+          bash -n .xgc2/debian/xgc2-utils-linux-timezone/postinst
+          bash -n .xgc2/debian/xgc2-utils-linux-timezone/prerm
+          bash -n .xgc2/debian/xgc2-utils-linux-timezone/postrm
           bash -n scripts/xcli
+          bash -n scripts/configure-timezone.sh
+          bash -n scripts/configure-time-sync.sh
           python3 .xgc2/scripts/check-workflow-bootstrap.py
 
   build:

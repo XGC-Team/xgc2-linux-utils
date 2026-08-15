@@ -1,0 +1,15 @@
+#!/bin/sh
+set -e
+
+LIB_DIR="/usr/lib/xgc2-utils/linux"
+
+if [ "$1" = "remove" ] || [ "$1" = "deconfigure" ]; then
+  if [ -x "${LIB_DIR}/configure-timezone.sh" ]; then
+    "${LIB_DIR}/configure-timezone.sh" --restore || true
+  fi
+  if [ -x "${LIB_DIR}/configure-time-sync.sh" ]; then
+    "${LIB_DIR}/configure-time-sync.sh" --restore || true
+  fi
+fi
+
+exit 0

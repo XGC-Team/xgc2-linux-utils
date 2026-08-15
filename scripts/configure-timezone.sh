@@ -48,12 +48,17 @@ current_zone() {
 
 apply_zone() {
   local zone="$1"
-  if command -v timedatectl >/dev/null 2>&1; then
-    timedatectl set-timezone "${zone}"
-  else
-    ln -sfn "/usr/share/zoneinfo/${zone}" /etc/localtime
-    printf '%s\n' "${zone}" > /etc/timezone
+  if [[ ! -e "/usr/share/zoneinfo/${zone}" ]]; then
+    echo "missing zoneinfo ${zone}; install tzdata" >&2
+    return 1
   fi
+  if command -v timedatectl >/dev/null 2>&1; then
+    if timedatectl set-timezone "${zone}" >/dev/null 2>&1; then
+      return 0
+    fi
+  fi
+  ln -sfn "/usr/share/zoneinfo/${zone}" /etc/localtime
+  printf '%s\n' "${zone}" > /etc/timezone
 }
 
 if [[ "$(id -u)" -ne 0 ]]; then

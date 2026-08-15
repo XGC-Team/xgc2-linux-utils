@@ -1,0 +1,13 @@
+#!/bin/sh
+# Apply Asia/Shanghai and enable NTP. Timezone does not need a network.
+# NTP starts syncing when a network appears; do not wait here.
+set -e
+
+LIB_DIR="/usr/lib/xgc2-utils/linux"
+
+if [ "$1" = "configure" ]; then
+  "${LIB_DIR}/configure-timezone.sh" shanghai
+  "${LIB_DIR}/configure-time-sync.sh" || true
+fi
+
+exit 0
