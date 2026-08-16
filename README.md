@@ -3,7 +3,7 @@
 This product no longer publishes APT packages.
 
 Timezone, CPU governor, screen idle, autologin, and sleep are host policy.
-Operators change them in Core/Agent **System → Overview → Host policy**.
+Operators change them in Core/Agent **System → Host**.
 The station applies native Linux interfaces (`timedatectl`, sysfs governors,
 dconf/display-manager drop-ins, systemd-logind). It does not install
 `xgc2-utils-linux-*` and does not wrap `xcli`.
