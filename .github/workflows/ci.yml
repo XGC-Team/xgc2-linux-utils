@@ -38,97 +38,25 @@ jobs:
           bash -n scripts/configure-timezone.sh
           bash -n scripts/configure-time-sync.sh
           python3 .xgc2/scripts/check-workflow-bootstrap.py
-  build:
-    name: ${{ matrix.name }}
-    strategy:
-      fail-fast: false
-      matrix:
-        include:
-          - name: amd64-bionic-melodic
-            distro: bionic
-            ros: melodic
-            arch: amd64
-            runner: ubuntu-latest
-            image: ghcr.io/xgc-team/xgc2-images/xgc2-build-bionic-ros-melodic:1.0.0
-          - name: arm64-bionic-melodic
-            distro: bionic
-            ros: melodic
-            arch: arm64
-            runner: ubuntu-24.04-arm
-            image: ghcr.io/xgc-team/xgc2-images/xgc2-build-bionic-ros-melodic:1.0.0
-          - name: amd64-focal-noetic
-            distro: focal
-            ros: noetic
-            arch: amd64
-            runner: ubuntu-latest
-            image: ghcr.io/xgc-team/xgc2-images/xgc2-build-focal-ros-noetic:1.0.0
-          - name: arm64-focal-noetic
-            distro: focal
-            ros: noetic
-            arch: arm64
-            runner: ubuntu-24.04-arm
-            image: ghcr.io/xgc-team/xgc2-images/xgc2-build-focal-ros-noetic:1.0.0
-          - name: amd64-jammy-humble
-            distro: jammy
-            ros: humble
-            arch: amd64
-            runner: ubuntu-latest
-            image: ghcr.io/xgc-team/xgc2-images/xgc2-build-jammy-ros-humble:1.0.0
-          - name: arm64-jammy-humble
-            distro: jammy
-            ros: humble
-            arch: arm64
-            runner: ubuntu-24.04-arm
-            image: ghcr.io/xgc-team/xgc2-images/xgc2-build-jammy-ros-humble:1.0.0
-          - name: amd64-noble-jazzy
-            distro: noble
-            ros: jazzy
-            arch: amd64
-            runner: ubuntu-latest
-            image: ghcr.io/xgc-team/xgc2-images/xgc2-build-noble-ros-jazzy:1.0.0
-          - name: arm64-noble-jazzy
-            distro: noble
-            ros: jazzy
-            arch: arm64
-            runner: ubuntu-24.04-arm
-            image: ghcr.io/xgc-team/xgc2-images/xgc2-build-noble-ros-jazzy:1.0.0
-    runs-on: ${{ matrix.runner }}
-    defaults:
-      run:
-        shell: bash
+  retirement-contract:
+    name: retirement-contract
+    runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
-
-
-
-      - name: Build and smoke in CI image
+      - name: Verify no retired package can be built or published
         run: |
           set -euo pipefail
-          .xgc2/scripts/ci_in_image.sh \
-            --image "${{ matrix.image }}" \
-            --output-dir "$GITHUB_WORKSPACE/debs"
+          grep -q '^summary: Retired APT product\.' .xgc2/product.yml
+          grep -q '^  install: \[\]$' .xgc2/product.yml
+          grep -q '^  packages: \[\]$' .xgc2/product.yml
+          grep -q '^  paths: \[\]$' .xgc2/product.yml
+          grep -q '^  apt_versions: {}$' .xgc2/product.yml
 
-      - name: Create trusted build manifests
-        run: |
-          product_version="$(awk -F': *' '/^version:/ {print $2; exit}' .xgc2/product.yml)"
-          python3 .xgc2/scripts/xgc2_artifact_manifest.py build \
-            --deb-dir debs \
-            --output-dir .ci/build-manifests \
-            --product xgc2-linux-utils \
-            --product-version "$product_version" \
-            --distribution "${{ matrix.distro }}" \
-            --architecture "${{ matrix.arch }}" \
-            --source-sha "$GITHUB_SHA" \
-            --ci-run-id "$GITHUB_RUN_ID" \
-            --ci-workflow "$GITHUB_WORKFLOW" \
-            --ci-workflow-ref "$GITHUB_WORKFLOW_REF"
-
-      - name: Upload deb artifacts
-        uses: actions/upload-artifact@v4
-        with:
-          name: xgc2-utils-linux-${{ matrix.name }}
-          path: |
-            debs/*.deb
-            .ci/build-manifests/*.json
-          retention-days: 14
-          include-hidden-files: true
+          retirement_log="$(mktemp)"
+          if .xgc2/scripts/package_debs.sh --output-dir "$RUNNER_TEMP/debs" >"$retirement_log" 2>&1; then
+            echo "retired package builder unexpectedly succeeded" >&2
+            exit 1
+          fi
+          grep -q 'xgc2-utils-linux-\* packages are retired' "$retirement_log"
+          test ! -d "$RUNNER_TEMP/debs" || ! find "$RUNNER_TEMP/debs" -name '*.deb' -print -quit | grep -q .
+          echo "Retirement contract verified: no install targets, owned paths, APT versions, or build artifacts."
